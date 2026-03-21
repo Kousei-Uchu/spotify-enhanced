@@ -80,7 +80,7 @@ Your working directory should now contain `hacs.json`, `README.md`,
 
 ### 2.2 Replace placeholder text
 
-Every place that says `Kousei-Uchu` needs your actual GitHub username.
+Every place that says `YOUR_GITHUB_USERNAME` needs your actual GitHub username.
 Run this one-liner (replace `your_actual_username`):
 
 ```bash
@@ -90,8 +90,8 @@ REPO="spotify-enhanced"
 
 find . -type f \( -name "*.json" -o -name "*.md" -o -name "*.yml" -o -name "*.sh" \) \
   | xargs sed -i.bak \
-      -e "s/Kousei-Uchu/${USERNAME}/g" \
-      -e "s|Kousei-Uchu/spotify-enhanced|${USERNAME}/${REPO}|g"
+      -e "s/YOUR_GITHUB_USERNAME/${USERNAME}/g" \
+      -e "s|your-repo|${USERNAME}/${REPO}|g"
 
 # Remove the .bak files sed creates on macOS
 find . -name "*.bak" -delete
@@ -104,8 +104,8 @@ $REPO     = "spotify-enhanced"
 
 Get-ChildItem -Recurse -Include *.json,*.md,*.yml,*.sh | ForEach-Object {
     (Get-Content $_.FullName) `
-        -replace 'Kousei-Uchu', $USERNAME `
-        -replace 'Kousei-Uchu/spotify-enhanced', "$USERNAME/$REPO" |
+        -replace 'YOUR_GITHUB_USERNAME', $USERNAME `
+        -replace 'your-repo', "$USERNAME/$REPO" |
     Set-Content $_.FullName
 }
 ```

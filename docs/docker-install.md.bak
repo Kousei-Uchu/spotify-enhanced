@@ -4,7 +4,7 @@
 
 ```bash
 # Assuming your HA config is at /path/to/config on the host:
-git clone https://github.com/Kousei-Uchu/spotify-enhanced.git
+git clone https://github.com/YOUR_GITHUB_USERNAME/spotify-enhanced.git
 cd spotify-enhanced
 ./install.sh /path/to/config
 docker restart homeassistant

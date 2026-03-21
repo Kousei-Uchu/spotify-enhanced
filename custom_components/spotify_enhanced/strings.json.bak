@@ -1,0 +1,29 @@
+{
+  "config": {
+    "step": {
+      "pick_implementation": {
+        "title": "Spotify Enhanced — Connect Account",
+        "description": "Before continuing, open your [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add this Redirect URI to your app:\n\n`{redirect_uri}`\n\nThen enter your Client ID and Secret below."
+      }
+    },
+    "abort": {
+      "already_configured": "This Spotify account is already configured.",
+      "missing_credentials": "Application credentials not found. Add them in Settings → Application Credentials.",
+      "oauth_error": "Unexpected OAuth error. Check the Home Assistant logs.",
+      "oauth_unauthorized": "Invalid Client ID or Secret.",
+      "oauth_timeout": "OAuth timed out. Please try again.",
+      "unknown": "Unexpected error."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Spotify Enhanced Options",
+        "data": {
+          "update_interval": "Poll interval (seconds)",
+          "show_unavailable_devices": "Show offline devices"
+        }
+      }
+    }
+  }
+}

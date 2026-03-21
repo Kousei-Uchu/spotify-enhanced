@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint & validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install homeassistant spotipy ruff
+
+      - name: Lint with ruff
+        run: ruff check custom_components/spotify_enhanced/ --select E,W,F --ignore E501
+
+      - name: Validate JSON files
+        run: |
+          python - << 'EOF'
+          import json, pathlib, sys
+          errors = []
+          for p in pathlib.Path("custom_components/spotify_enhanced").rglob("*.json"):
+              try:
+                  json.loads(p.read_text())
+              except json.JSONDecodeError as e:
+                  errors.append(f"{p}: {e}")
+          if errors:
+              print("\n".join(errors))
+              sys.exit(1)
+          print(f"All JSON files valid")
+          EOF
+
+      - name: Validate manifest
+        run: |
+          python - << 'EOF'
+          import json, sys
+          m = json.loads(open("custom_components/spotify_enhanced/manifest.json").read())
+          for key in ["domain","name","version","requirements","config_flow","iot_class","dependencies"]:
+              assert key in m, f"Missing key: {key}"
+          assert "application_credentials" in m["dependencies"], "application_credentials must be a dependency"
+          print("manifest.json OK")
+          EOF
+
+      - name: Check translations match strings
+        run: |
+          python - << 'EOF'
+          import json, sys
+          s = json.loads(open("custom_components/spotify_enhanced/strings.json").read())
+          e = json.loads(open("custom_components/spotify_enhanced/translations/en.json").read())
+          assert s == e, "strings.json and translations/en.json are out of sync"
+          print("Translations OK")
+          EOF
+
+      - name: Validate JS card (syntax check)
+        run: |
+          node --check www/spotify-enhanced-card/spotify-enhanced-card.js && echo "JS syntax OK"

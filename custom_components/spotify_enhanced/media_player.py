@@ -152,7 +152,6 @@ class SpotifyMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
                 "track_id": item.get("id"),
                 "track_uri": item.get("uri"),
                 "context_uri": ctx.get("uri"),
-                "is_dj": ctx.get("uri") == "spotify:genre:0JQ5DAt0tbjZptfcdMSKl3",
             })
         return attrs
 

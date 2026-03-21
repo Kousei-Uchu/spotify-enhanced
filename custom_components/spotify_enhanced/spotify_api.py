@@ -7,7 +7,6 @@ from typing import Any
 import spotipy
 from homeassistant.core import HomeAssistant
 
-from .const import SPOTIFY_DJ_URI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -167,17 +166,3 @@ class SpotifyAPI:
         return await self._run(lambda sp: sp.search(query, limit=limit, type=search_types))
 
     # ------------------------------------------------------------------ #
-    # DJ
-    # ------------------------------------------------------------------ #
-
-    async def start_dj(self, device_id=None):
-        await self.play(device_id=device_id, context_uri=SPOTIFY_DJ_URI)
-
-    async def dj_next_section(self, device_id=None):
-        await self.next_track(device_id=device_id)
-
-    async def dj_request(self, request_text: str, device_id=None):
-        results = await self.search(request_text, types=["track"], limit=1)
-        tracks = (results or {}).get("tracks", {}).get("items", [])
-        if tracks:
-            await self.add_to_queue(tracks[0]["uri"], device_id=device_id)

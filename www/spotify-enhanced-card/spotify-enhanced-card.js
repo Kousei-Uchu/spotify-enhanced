@@ -51,8 +51,6 @@ const I = {
   chevron_r:  "M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6z",
   chevron_d:  "M16.59 8.59 12 13.17 7.41 8.59 6 10l6 6 6-6-1.41-1.41z",
   close:      "M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z",
-  robot:      "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13A2.5 2.5 0 0 0 5 15.5 2.5 2.5 0 0 0 7.5 18a2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 7.5 13m9 0a2.5 2.5 0 0 0-2.5 2.5 2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0 2.5-2.5A2.5 2.5 0 0 0 16.5 13z",
-  mic:        "M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V5a3 3 0 0 1 3-3m7 9c0 3.53-2.61 6.44-6 6.93V21h-2v-3.07c-3.39-.49-6-3.4-6-6.93h2a5 5 0 0 0 5 5 5 5 0 0 0 5-5h2z",
   more:       "M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
   up:         "M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6 1.41 1.41z",
   add_queue:  "M13 8H3V6h10v2zm0 4H3v-2h10v2zm4 4H3v-2h14v2zm-1 6v-3h-2v3h-3v2h3v3h2v-3h3v-2h-3z",
@@ -146,7 +144,6 @@ class SpotifyBase extends HTMLElement {
   get _durMs()     { return (this._attr.media_duration ?? 0) * 1000; }
   get _devices()   { return this._attr.spotify_devices ?? []; }
   get _devId()     { return this._attr.device_id ?? null; }
-  get _isDJ()      { return this._attr.is_dj ?? false; }
   get _trackId()   { return this._attr.track_id ?? null; }
   get _trackUri()  { return this._attr.track_uri ?? null; }
   get _ctxUri()    { return this._attr.context_uri ?? null; }
@@ -381,8 +378,6 @@ class SpotifyEnhancedCard extends SpotifyBase {
     super();
     this._prog   = null; // ProgressController
     this._vol    = null; // VolumeController
-    this._djHold = null;
-    this._djHoldActive = false;
     this._searchQuery   = "";
     this._searchResults = null;
     this._searchOffset  = { tracks: 0, albums: 0, artists: 0, playlists: 0 };
@@ -419,7 +414,6 @@ class SpotifyEnhancedCard extends SpotifyBase {
 
   disconnectedCallback() {
     this._prog?.destroy();
-    clearTimeout(this._djHold);
   }
 
   // ── Build DOM ─────────────────────────────────────────────────────────────
@@ -480,304 +474,6 @@ class SpotifyEnhancedCard extends SpotifyBase {
           font-size: 0.78rem; color: rgba(255,255,255,0.7); margin-top: 2px;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        .dj-pill {
-          display: inline-flex; align-items: center; gap: 3px;
-          background: var(--se-accent); color: #000;
-          font-size: 0.58rem; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.5px; padding: 2px 6px; border-radius: 20px;
-          margin-bottom: 4px;
-        }
-        /* Like button top-right */
-        .like-btn {
-          position: absolute; top: 10px; right: 10px;
-          background: rgba(0,0,0,0.35); border-radius: 50%;
-          width: 36px; height: 36px;
-          backdrop-filter: blur(4px);
-          -webkit-backdrop-filter: blur(4px);
-          color: rgba(255,255,255,0.8);
-        }
-        .like-btn.liked { color: var(--se-accent); }
-
-        /* Controls area (fixed height, never scrolls) */
-        .controls-section {
-          flex: 0 0 auto;
-          background: var(--se-bg);
-          padding: 0;
-        }
-
-        /* Seek bar – matches HA media-control-card style */
-        .seek-wrap {
-          padding: 8px 16px 2px;
-          display: var(--seek-display, block);
-        }
-        .seek-track {
-          position: relative; height: 4px; background: var(--se-bg3);
-          border-radius: 2px; cursor: pointer; touch-action: none;
-        }
-        .seek-fill {
-          position: absolute; left: 0; top: 0; height: 100%;
-          background: var(--se-accent); border-radius: 2px;
-          pointer-events: none;
-          transition: width 0.1s linear;
-        }
-        .seek-thumb {
-          position: absolute; top: 50%; right: 0;
-          width: 12px; height: 12px; border-radius: 50%;
-          background: var(--se-txt); transform: translate(50%,-50%);
-          opacity: 0; transition: opacity 0.15s;
-          pointer-events: none;
-        }
-        .seek-track:hover .seek-thumb,
-        .seek-track.dragging .seek-thumb { opacity: 1; }
-        .seek-track.dragging .seek-fill { transition: none; }
-        .seek-times {
-          display: flex; justify-content: space-between;
-          font-size: 0.68rem; color: var(--se-txt2); margin-top: 3px;
-        }
-
-        /* Main control buttons row – HA media-card layout */
-        .ctrl-row {
-          display: flex; align-items: center; justify-content: center;
-          gap: 0; padding: 6px 16px 4px;
-        }
-        .ctrl-btn {
-          width: 44px; height: 44px; border-radius: 50%;
-          color: var(--se-txt2);
-          flex-shrink: 0;
-        }
-        .ctrl-btn:hover { background: var(--se-bg3); color: var(--se-txt); }
-        .play-pause-btn {
-          width: 52px; height: 52px; border-radius: 50%;
-          background: var(--se-txt);
-          color: var(--se-bg);
-          margin: 0 4px;
-        }
-        .play-pause-btn:hover { background: var(--se-accent); color: #000; }
-        .play-pause-btn:active { transform: scale(0.88); }
-        .spacer { flex: 1; }
-
-        /* Volume row */
-        .vol-row {
-          display: var(--vol-display, flex);
-          align-items: center; gap: 6px;
-          padding: 2px 16px 6px;
-        }
-        .vol-icon-btn { width: 28px; height: 28px; color: var(--se-txt2); flex-shrink: 0; }
-        .vol-track {
-          flex: 1; height: 4px; background: var(--se-bg3);
-          border-radius: 2px; cursor: pointer; position: relative;
-          touch-action: none;
-        }
-        .vol-fill {
-          position: absolute; left: 0; top: 0; height: 100%;
-          background: var(--se-txt2); border-radius: 2px;
-          pointer-events: none;
-        }
-        .vol-thumb {
-          position: absolute; top: 50%; right: 0;
-          width: 12px; height: 12px; border-radius: 50%;
-          background: var(--se-txt); transform: translate(50%,-50%);
-          opacity: 0; transition: opacity 0.15s;
-          pointer-events: none;
-        }
-        .vol-track:hover .vol-thumb { opacity: 1; }
-
-        /* Action chips row (Library / Search / Devices / Queue) */
-        .chips-row {
-          display: flex; align-items: center; gap: 6px;
-          padding: 2px 16px 10px; flex-wrap: nowrap; overflow-x: auto;
-          scrollbar-width: none;
-        }
-        .chips-row::-webkit-scrollbar { display: none; }
-        .chip {
-          display: inline-flex; align-items: center; gap: 4px;
-          padding: 5px 10px; border-radius: 16px;
-          font-size: 0.72rem; font-weight: 600;
-          background: var(--se-bg2); color: var(--se-txt2);
-          white-space: nowrap; cursor: pointer;
-          border: 1px solid transparent;
-          transition: background 0.15s, color 0.15s, border-color 0.15s;
-          height: 28px;
-        }
-        .chip:hover { background: var(--se-bg3); color: var(--se-txt); }
-        .chip.active {
-          background: color-mix(in srgb, var(--se-accent) 15%, transparent);
-          color: var(--se-accent);
-          border-color: color-mix(in srgb, var(--se-accent) 40%, transparent);
-        }
-
-        /* Slide-up panels */
-        .panel-backdrop {
-          display: none;
-          position: absolute; inset: 0;
-          background: rgba(0,0,0,0.45);
-          z-index: 10;
-          backdrop-filter: blur(2px);
-          -webkit-backdrop-filter: blur(2px);
-        }
-        .panel-backdrop.open { display: block; }
-
-        .slide-panel {
-          position: absolute; bottom: 0; left: 0; right: 0;
-          background: var(--se-bg);
-          border-radius: var(--se-r) var(--se-r) 0 0;
-          z-index: 11;
-          transform: translateY(100%);
-          transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
-          max-height: 75%;
-          display: flex; flex-direction: column;
-          overflow: hidden;
-        }
-        .slide-panel.open { transform: translateY(0); }
-
-        .panel-header {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 12px 16px 8px; flex-shrink: 0;
-          border-bottom: 1px solid var(--se-bg3);
-        }
-        .panel-title {
-          font-size: 0.82rem; font-weight: 700; text-transform: uppercase;
-          letter-spacing: 0.7px; color: var(--se-txt2);
-          display: flex; align-items: center; gap: 6px;
-        }
-        .panel-close {
-          width: 30px; height: 30px; border-radius: 50%; color: var(--se-txt2);
-        }
-        .panel-close:hover { background: var(--se-bg3); color: var(--se-txt); }
-        .panel-body {
-          flex: 1; overflow-y: auto; overflow-x: hidden;
-          scrollbar-width: thin; scrollbar-color: var(--se-bg3) transparent;
-        }
-        .panel-body::-webkit-scrollbar { width: 3px; }
-        .panel-body::-webkit-scrollbar-thumb { background: var(--se-bg3); }
-
-        /* List items */
-        .list-item {
-          display: flex; align-items: center; gap: 10px;
-          padding: 7px 16px; cursor: pointer;
-          transition: background 0.1s;
-        }
-        .list-item:hover { background: var(--se-bg2); }
-        .list-item.playing { background: color-mix(in srgb, var(--se-accent) 10%, transparent); }
-        .item-thumb {
-          width: 40px; height: 40px; border-radius: 4px;
-          object-fit: cover; flex-shrink: 0; background: var(--se-bg3);
-        }
-        .item-thumb.round { border-radius: 50%; }
-        .item-placeholder {
-          width: 40px; height: 40px; border-radius: 4px;
-          background: var(--se-bg3); flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-          color: var(--se-txt2);
-        }
-        .item-info { flex: 1; min-width: 0; }
-        .item-title {
-          font-size: 0.85rem; font-weight: 500;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          color: var(--se-txt);
-        }
-        .item-sub {
-          font-size: 0.72rem; color: var(--se-txt2); margin-top: 1px;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
-        .item-action {
-          width: 32px; height: 32px; border-radius: 50%;
-          color: var(--se-txt2); flex-shrink: 0;
-        }
-        .item-action:hover { background: var(--se-bg3); color: var(--se-txt); }
-
-        /* Section label */
-        .sec-label {
-          padding: 10px 16px 4px;
-          font-size: 0.65rem; font-weight: 700;
-          text-transform: uppercase; letter-spacing: 0.8px;
-          color: var(--se-txt2);
-        }
-
-        /* Breadcrumb */
-        .breadcrumb {
-          display: flex; align-items: center; gap: 2px;
-          padding: 8px 16px 4px; overflow-x: auto; scrollbar-width: none;
-        }
-        .breadcrumb::-webkit-scrollbar { display: none; }
-        .crumb {
-          font-size: 0.75rem; padding: 2px 6px; border-radius: 6px;
-          color: var(--se-txt2); white-space: nowrap;
-        }
-        .crumb:hover { background: var(--se-bg2); color: var(--se-txt); }
-        .crumb.last { color: var(--se-txt); font-weight: 600; }
-        .crumb-sep { color: var(--se-bg3); font-size: 0.8rem; }
-
-        /* Search */
-        .search-bar {
-          display: flex; gap: 6px; padding: 10px 16px 6px;
-          flex-shrink: 0;
-        }
-        .search-input {
-          flex: 1; background: var(--se-bg2);
-          border: 1.5px solid var(--se-bg3); border-radius: 8px;
-          color: var(--se-txt); padding: 7px 10px;
-          font-size: 0.85rem; outline: none;
-          transition: border-color 0.15s;
-        }
-        .search-input:focus { border-color: var(--se-accent); }
-        .search-go {
-          background: var(--se-accent) !important; color: #000 !important;
-          border-radius: 8px; width: 36px; height: 36px;
-        }
-        .show-more {
-          display: block; width: 100%;
-          padding: 7px; text-align: center;
-          font-size: 0.75rem; color: var(--se-accent);
-          border-top: 1px solid var(--se-bg3);
-          background: transparent;
-        }
-        .show-more:hover { background: var(--se-bg2); }
-
-        /* Devices */
-        .device-item {
-          display: flex; align-items: center; gap: 10px;
-          padding: 9px 16px; cursor: pointer;
-          transition: background 0.12s;
-        }
-        .device-item:hover { background: var(--se-bg2); }
-        .device-item.active {
-          background: color-mix(in srgb, var(--se-accent) 12%, transparent);
-        }
-        .device-icon { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--se-txt2); flex-shrink: 0; }
-        .device-name { flex: 1; font-size: 0.88rem; font-weight: 500; }
-        .device-vol  { font-size: 0.75rem; color: var(--se-txt2); }
-        .active-dot  { width: 7px; height: 7px; border-radius: 50%; background: var(--se-accent); flex-shrink: 0; }
-
-        /* DJ panel (inside player) */
-        .dj-section { padding: 8px 16px 10px; }
-        .dj-row { display: flex; gap: 6px; }
-        .dj-btn {
-          flex: 1; padding: 8px; border-radius: 8px;
-          font-size: 0.78rem; font-weight: 600;
-          display: flex; align-items: center; justify-content: center; gap: 5px;
-          background: var(--se-bg2) !important; color: var(--se-txt);
-        }
-        .dj-btn-primary { background: var(--se-accent) !important; color: #000 !important; }
-        .dj-skip-btn {
-          width: 100%; padding: 9px; border-radius: 8px; margin-top: 6px;
-          background: var(--se-bg2) !important; color: var(--se-txt);
-          display: flex; align-items: center; justify-content: space-between;
-          font-size: 0.82rem; font-weight: 600;
-        }
-        .dj-hint { font-size: 0.65rem; color: var(--se-txt2); text-align: right; line-height: 1.3; }
-        .dj-req-wrap { display: none; margin-top: 6px; gap: 6px; }
-        .dj-req-wrap.open { display: flex; }
-        .dj-req-input {
-          flex: 1; background: var(--se-bg2); border: 1.5px solid var(--se-bg3);
-          border-radius: 8px; color: var(--se-txt); padding: 7px 10px;
-          font-size: 0.82rem; outline: none; transition: border-color 0.15s;
-        }
-        .dj-req-input:focus { border-color: var(--se-accent); }
-        .dj-req-btn {
-          background: var(--se-accent) !important; color: #000 !important;
-          border-radius: 8px; padding: 7px 10px; font-size: 0.8rem; font-weight: 700;
-        }
 
         /* Queue */
         .queue-now {
@@ -798,7 +494,6 @@ class SpotifyEnhancedCard extends SpotifyBase {
           <div class="art-gradient"></div>
           <div class="art-info">
             <div class="art-info-text">
-              <div id="dj-pill" class="dj-pill" style="display:none">${svg(I.robot,11)} DJ</div>
               <div class="track-name" id="track-name">Nothing playing</div>
               <div class="track-sub"  id="track-sub"></div>
             </div>
@@ -843,7 +538,6 @@ class SpotifyEnhancedCard extends SpotifyBase {
 
           <!-- Action chips -->
           <div class="chips-row">
-            <div class="chip" id="chip-dj">${svg(I.robot,13)}&nbsp;DJ</div>
             <div class="chip" id="chip-lib">${svg(I.library,13)}&nbsp;Library</div>
             <div class="chip" id="chip-search">${svg(I.search,13)}&nbsp;Search</div>
             <div class="chip" id="chip-queue">${svg(I.queue_music,13)}&nbsp;Queue</div>
@@ -854,28 +548,6 @@ class SpotifyEnhancedCard extends SpotifyBase {
         <!-- Panel backdrop -->
         <div class="panel-backdrop" id="backdrop"></div>
 
-        <!-- DJ Panel -->
-        <div class="slide-panel" id="panel-dj">
-          <div class="panel-header">
-            <div class="panel-title">${svg(I.robot,15)}&nbsp;Spotify DJ</div>
-            <button class="panel-close" id="close-dj">${svg(I.close,18)}</button>
-          </div>
-          <div class="panel-body">
-            <div class="dj-section">
-              <div class="dj-row">
-                <button class="dj-btn dj-btn-primary" id="dj-start">${svg(I.play,14)}&nbsp;Start DJ</button>
-              </div>
-              <button class="dj-skip-btn" id="dj-skip-hold">
-                <span style="display:flex;align-items:center;gap:6px">${svg(I.next,18)}&nbsp;Skip Section</span>
-                <span class="dj-hint">Tap: skip<br>Hold: request</span>
-              </button>
-              <div class="dj-req-wrap" id="dj-req-wrap">
-                <input class="dj-req-input" id="dj-req-input" placeholder="Request something…" />
-                <button class="dj-req-btn" id="dj-req-btn">${svg(I.mic,16)}</button>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- Library Panel -->
         <div class="slide-panel" id="panel-lib">
@@ -987,20 +659,18 @@ class SpotifyEnhancedCard extends SpotifyBase {
     });
 
     // Chips → open panels
-    const panels = { dj: "panel-dj", lib: "panel-lib", search: "panel-search", queue: "panel-queue", devices: "panel-devices" };
+    const panels = { lib: "panel-lib", search: "panel-search", queue: "panel-queue", devices: "panel-devices" };
     for (const [chip, panel] of Object.entries(panels)) {
       s.getElementById(`chip-${chip}`).addEventListener("click", () => this._openPanel(panel, chip));
     }
 
     // Panel close buttons + backdrop
-    const closeIds = { "close-dj": "dj", "close-lib": "lib", "close-search": "search", "close-queue": "queue", "close-devices": "devices" };
+    const closeIds = { "close-lib": "lib", "close-search": "search", "close-queue": "queue", "close-devices": "devices" };
     for (const [btnId, chip] of Object.entries(closeIds)) {
       s.getElementById(btnId)?.addEventListener("click", () => this._closePanel(chip));
     }
     s.getElementById("backdrop").addEventListener("click", () => this._closeAll());
 
-    // DJ events
-    this._bindDJEvents();
 
     // Search events
     this._bindSearchEvents();
@@ -1034,7 +704,7 @@ class SpotifyEnhancedCard extends SpotifyBase {
 
   _closePanel(chipId) {
     const s = this.shadowRoot;
-    const map = { dj: "panel-dj", lib: "panel-lib", search: "panel-search", queue: "panel-queue", devices: "panel-devices" };
+    const map = { lib: "panel-lib", search: "panel-search", queue: "panel-queue", devices: "panel-devices" };
     s.getElementById(map[chipId])?.classList.remove("open");
     s.getElementById(`chip-${chipId}`)?.classList.remove("active");
     const anyOpen = Object.values(map).some(p => s.getElementById(p)?.classList.contains("open"));
@@ -1043,9 +713,9 @@ class SpotifyEnhancedCard extends SpotifyBase {
 
   _closeAll(andBackdrop = true) {
     const s = this.shadowRoot;
-    const panels = ["panel-dj", "panel-lib", "panel-search", "panel-queue", "panel-devices"];
+    const panels = ["panel-lib", "panel-search", "panel-queue", "panel-devices"];
     panels.forEach(p => s.getElementById(p)?.classList.remove("open"));
-    const chips = ["chip-dj", "chip-lib", "chip-search", "chip-queue", "chip-devices"];
+    const chips = ["chip-lib", "chip-search", "chip-queue", "chip-devices"];
     chips.forEach(c => s.getElementById(c)?.classList.remove("active"));
     if (andBackdrop) s.getElementById("backdrop").classList.remove("open");
   }
@@ -1079,42 +749,6 @@ class SpotifyEnhancedCard extends SpotifyBase {
     });
   }
 
-  // ── DJ events ───────────────────────────────────────────────────────────
-
-  _bindDJEvents() {
-    const s = this.shadowRoot;
-    s.getElementById("dj-start")?.addEventListener("click", () => this._spotify("start_dj"));
-
-    const skipBtn = s.getElementById("dj-skip-hold");
-    if (skipBtn) {
-      skipBtn.addEventListener("pointerdown", () => {
-        this._djHoldActive = false;
-        this._djHold = setTimeout(() => {
-          this._djHoldActive = true;
-          s.getElementById("dj-req-wrap")?.classList.add("open");
-          s.getElementById("dj-req-input")?.focus();
-        }, 500);
-      });
-      skipBtn.addEventListener("pointerup", () => {
-        clearTimeout(this._djHold);
-        if (!this._djHoldActive) this._spotify("dj_next_section");
-      });
-      skipBtn.addEventListener("pointerleave", () => clearTimeout(this._djHold));
-    }
-
-    s.getElementById("dj-req-btn")?.addEventListener("click", () => {
-      const val = s.getElementById("dj-req-input")?.value?.trim();
-      if (val) {
-        this._spotify("dj_request", { request_text: val });
-        s.getElementById("dj-req-input").value = "";
-        s.getElementById("dj-req-wrap")?.classList.remove("open");
-      }
-    });
-    s.getElementById("dj-req-input")?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter")  s.getElementById("dj-req-btn")?.click();
-      if (e.key === "Escape") s.getElementById("dj-req-wrap")?.classList.remove("open");
-    });
-  }
 
   // ── Search ───────────────────────────────────────────────────────────────
 
@@ -1501,7 +1135,6 @@ class SpotifyEnhancedCard extends SpotifyBase {
     s.getElementById("track-name").textContent = this._title || "Nothing playing";
     const sub = [this._artist, this._album].filter(Boolean).join(" · ");
     s.getElementById("track-sub").textContent = sub;
-    s.getElementById("dj-pill").style.display = this._isDJ ? "inline-flex" : "none";
 
     // --- Play button ---
     s.getElementById("play-btn").innerHTML = svg(this._playing ? I.pause : I.play, 26);
@@ -2039,7 +1672,7 @@ customElements.define("spotify-enhanced-card-editor", SpotifyEnhancedCardEditor)
 
 window.customCards = window.customCards || [];
 window.customCards.push(
-  { type: "spotify-enhanced-card", name: "Spotify Enhanced — Media Deck",    description: "Full player: art, controls, seek, volume, DJ, library, search, queue, devices.",   preview: true },
+  { type: "spotify-enhanced-card", name: "Spotify Enhanced — Media Deck",    description: "Full player: art, controls, seek, volume, library, search, queue, devices.",   preview: true },
   { type: "spotify-mini-card",     name: "Spotify Enhanced — Mini Player",   description: "Compact single-row playback control.",                                               preview: true },
   { type: "spotify-device-card",   name: "Spotify Enhanced — Device Picker", description: "Browse and switch Spotify Connect devices.",                                          preview: true },
   { type: "spotify-search-card",   name: "Spotify Enhanced — Search",        description: "Standalone Spotify search card.",                                                     preview: true },

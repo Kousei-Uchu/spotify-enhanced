@@ -14,7 +14,6 @@ ROOTS = [
     ("spotify://category/top_artists",    "Top Artists",       "mdi:account-music",   True),
     ("spotify://category/new_releases",   "New Releases",      "mdi:new-box",         True),
     ("spotify://category/featured",       "Featured",          "mdi:star",            True),
-    ("spotify://category/dj",             "Spotify DJ",        "mdi:robot",           False),
 ]
 
 
@@ -38,7 +37,7 @@ def _root():
     children = [
         BrowseMedia(title=title, media_class=MediaClass.DIRECTORY,
                     media_content_id=cid, media_content_type=MediaType.MUSIC,
-                    can_play=(cid == "spotify://category/dj"), can_expand=expandable)
+                    can_play=False, can_expand=expandable)
         for cid, title, _, expandable in ROOTS
     ]
     return BrowseMedia(title="Spotify Enhanced", media_class=MediaClass.DIRECTORY,
@@ -50,13 +49,6 @@ async def _category(coordinator, category: str):
     api = coordinator.api
     children = []
 
-    if category == "dj":
-        return BrowseMedia(title="Spotify DJ", media_class=MediaClass.DIRECTORY,
-                           media_content_id="spotify://category/dj", media_content_type=MediaType.MUSIC,
-                           can_play=True, can_expand=False,
-                           children=[BrowseMedia(title="▶ Start Spotify DJ", media_class=MediaClass.MUSIC,
-                                                 media_content_id="spotify:genre:0JQ5DAt0tbjZptfcdMSKl3",
-                                                 media_content_type=MediaType.MUSIC, can_play=True, can_expand=False)])
 
     titles = dict((c, t) for c, t, _, _ in ROOTS)
 

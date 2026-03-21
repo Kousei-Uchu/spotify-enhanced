@@ -63,39 +63,6 @@ transfer_playback:
       selector:
         text:
 
-start_dj:
-  name: Start Spotify DJ
-  description: Start Spotify DJ mode on the active or specified device.
-  fields:
-    device_id:
-      name: Device ID
-      selector:
-        text:
-
-dj_next_section:
-  name: DJ — Skip Section
-  description: Skip to the next Spotify DJ section.
-  fields:
-    device_id:
-      name: Device ID
-      selector:
-        text:
-
-dj_request:
-  name: DJ — Make a Request
-  description: Search for a track matching the request and add it to the queue.
-  fields:
-    request_text:
-      name: Request
-      required: true
-      example: "something chill from the 90s"
-      selector:
-        text:
-    device_id:
-      name: Device ID
-      selector:
-        text:
-
 add_to_queue:
   name: Add to Queue
   description: Add a track to the current playback queue.

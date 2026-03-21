@@ -1,9 +1,9 @@
 {
   "name": "Spotify Enhanced",
   "category": "integration",
-  "documentation": "https://github.com/YOUR_GITHUB_USERNAME/spotify-enhanced/blob/main/README.md",
-  "issue_tracker": "https://github.com/YOUR_GITHUB_USERNAME/spotify-enhanced/issues",
-  "codeowners": ["@YOUR_GITHUB_USERNAME"],
+  "documentation": "https://github.com/Kousei-Uchu/spotify-enhanced/blob/main/README.md",
+  "issue_tracker": "https://github.com/Kousei-Uchu/spotify-enhanced/issues",
+  "codeowners": ["@Kousei-Uchu"],
   "homeassistant": "2023.6.0",
   "iot_class": "cloud_polling"
 }

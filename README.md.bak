@@ -40,14 +40,14 @@ A full-featured Spotify integration for Home Assistant. Provides complete playba
 ### HACS (Recommended)
 
 1. Open HACS → **Integrations** → **⋮** → **Custom repositories**
-2. URL: `https://github.com/Kousei-Uchu/spotify-enhanced` · Category: **Integration**
+2. URL: `https://github.com/YOUR_GITHUB_USERNAME/spotify-enhanced` · Category: **Integration**
 3. Install **Spotify Enhanced** and restart Home Assistant
 4. Open HACS → **Frontend** → search **Spotify Enhanced Card** → Install
 
 ### Manual
 
 ```bash
-git clone https://github.com/Kousei-Uchu/spotify-enhanced.git
+git clone https://github.com/YOUR_GITHUB_USERNAME/spotify-enhanced.git
 cd spotify-enhanced
 ./install.sh /config          # HAOS / Supervised
 ./install.sh /homeassistant   # Docker (adjust to your volume path)
@@ -281,7 +281,7 @@ See [`docs/troubleshooting.md`](docs/troubleshooting.md) for the full guide.
 
 ```bash
 # Clone and deploy to a new GitHub repo
-git clone https://github.com/Kousei-Uchu/spotify-enhanced.git
+git clone https://github.com/YOUR_GITHUB_USERNAME/spotify-enhanced.git
 cd spotify-enhanced
 ./deploy.sh
 
@@ -306,6 +306,6 @@ MIT — see [LICENSE](LICENSE)
 
 [hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg
 [hacs-url]: https://hacs.xyz
-[release-badge]: https://img.shields.io/github/release/Kousei-Uchu/spotify-enhanced.svg
-[release-url]: https://github.com/Kousei-Uchu/spotify-enhanced/releases
-[license-badge]: https://img.shields.io/github/license/Kousei-Uchu/spotify-enhanced.svg
+[release-badge]: https://img.shields.io/github/release/YOUR_GITHUB_USERNAME/spotify-enhanced.svg
+[release-url]: https://github.com/YOUR_GITHUB_USERNAME/spotify-enhanced/releases
+[license-badge]: https://img.shields.io/github/license/YOUR_GITHUB_USERNAME/spotify-enhanced.svg

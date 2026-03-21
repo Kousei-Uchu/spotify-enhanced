@@ -30,11 +30,6 @@ async def async_setup_services(hass: HomeAssistant):
         vol.Optional(ATTR_SEARCH_TYPE, default=["track"]): vol.All(cv.ensure_list, [vol.In(SEARCH_TYPES)]),
     }))
     svc.async_register(DOMAIN, SERVICE_TRANSFER, _transfer, vol.Schema({vol.Required(ATTR_DEVICE_ID): cv.string}))
-    svc.async_register(DOMAIN, SERVICE_START_DJ, _start_dj, vol.Schema({vol.Optional(ATTR_DEVICE_ID): cv.string}))
-    svc.async_register(DOMAIN, SERVICE_DJ_SKIP, _dj_skip, vol.Schema({vol.Optional(ATTR_DEVICE_ID): cv.string}))
-    svc.async_register(DOMAIN, SERVICE_DJ_REQUEST, _dj_request, vol.Schema({
-        vol.Required(ATTR_DJ_REQUEST): cv.string,
-        vol.Optional(ATTR_DEVICE_ID): cv.string,
     }))
     svc.async_register(DOMAIN, SERVICE_QUEUE_TRACK, _queue, vol.Schema({
         vol.Required(ATTR_TRACK_URI): cv.string,
@@ -74,18 +69,8 @@ async def _transfer(call: ServiceCall):
     await c.api.transfer_playback(call.data[ATTR_DEVICE_ID])
     await c.async_request_refresh()
 
-async def _start_dj(call: ServiceCall):
-    c = _coord(call.hass)
-    await c.api.start_dj(call.data.get(ATTR_DEVICE_ID))
-    await c.async_request_refresh()
 
-async def _dj_skip(call: ServiceCall):
-    c = _coord(call.hass)
-    await c.api.dj_next_section(call.data.get(ATTR_DEVICE_ID))
-    await c.async_request_refresh()
 
-async def _dj_request(call: ServiceCall):
-    await _coord(call.hass).api.dj_request(call.data[ATTR_DJ_REQUEST], call.data.get(ATTR_DEVICE_ID))
 
 async def _queue(call: ServiceCall):
     await _coord(call.hass).api.add_to_queue(call.data[ATTR_TRACK_URI], call.data.get(ATTR_DEVICE_ID))
