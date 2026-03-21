@@ -76,7 +76,7 @@ echo ""
 read -rp "Continue? [Y/n] " confirm
 [[ "${confirm,,}" == "n" ]] && exit 0
 
-# ── Update Kousei-Uchu placeholders ──────────────────────────────────
+# ── Update YOUR_GITHUB_USERNAME placeholders ──────────────────────────────────
 
 header "Patching username placeholders"
 
@@ -87,8 +87,8 @@ for f in \
   docs/troubleshooting.md \
   docs/docker-install.md; do
   if [[ -f "$f" ]]; then
-    sed -i "s/Kousei-Uchu/${GH_USER}/g" "$f"
-    sed -i "s/Kousei-Uchu/spotify-enhanced/${GH_USER}\/${REPO_NAME}/g" "$f"
+    sed -i "s/YOUR_GITHUB_USERNAME/${GH_USER}/g" "$f"
+    sed -i "s/your-repo/${GH_USER}\/${REPO_NAME}/g" "$f"
     ok "Patched $f"
   fi
 done

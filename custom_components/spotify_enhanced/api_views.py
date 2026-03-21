@@ -14,6 +14,8 @@ def async_register_views(hass: HomeAssistant):
     hass.http.register_view(SpotifyDevicesView)
     hass.http.register_view(SpotifyPlaybackView)
     hass.http.register_view(SpotifyBrowseView)
+    hass.http.register_view(SpotifyQueueView)
+    hass.http.register_view(SpotifyLikedView)
 
 
 def _coord(hass):
@@ -62,6 +64,46 @@ class SpotifyPlaybackView(HomeAssistantView):
         if not c:
             return self.json_message("Not configured", 503)
         return self.json(await c.api.get_current_playback() or {})
+
+
+class SpotifyQueueView(HomeAssistantView):
+    """Return the current playback queue."""
+
+    url = "/api/spotify_enhanced/queue"
+    name = "api:spotify_enhanced:queue"
+
+    async def get(self, request):
+        hass = request.app["hass"]
+        c = _coord(hass)
+        if not c:
+            return self.json_message("Not configured", 503)
+        try:
+            result = await c.api._run(lambda sp: sp.queue())
+            return self.json(result or {})
+        except Exception as e:
+            return self.json_message(str(e), 500)
+
+
+class SpotifyLikedView(HomeAssistantView):
+    """Check if track IDs are in the user's Liked Songs."""
+
+    url = "/api/spotify_enhanced/liked"
+    name = "api:spotify_enhanced:liked"
+
+    async def get(self, request):
+        hass = request.app["hass"]
+        c = _coord(hass)
+        if not c:
+            return self.json_message("Not configured", 503)
+        ids_raw = request.query.get("ids", "")
+        ids = [i.strip() for i in ids_raw.split(",") if i.strip()]
+        if not ids:
+            return self.json([])
+        try:
+            result = await c.api._run(lambda sp: sp.current_user_saved_tracks_contains(ids))
+            return self.json(result or [False] * len(ids))
+        except Exception as e:
+            return self.json_message(str(e), 500)
 
 
 class SpotifyBrowseView(HomeAssistantView):
