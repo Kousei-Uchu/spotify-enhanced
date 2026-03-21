@@ -9,9 +9,18 @@ from .const import DOMAIN, MANUFACTURER
 from .coordinator import SpotifyDataUpdateCoordinator
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+):
     coord: SpotifyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([SpotifyNowPlayingSensor(coord, entry), SpotifyDevicesSensor(coord, entry)])
+    async_add_entities([
+        SpotifyNowPlayingSensor(coord, entry),
+        SpotifyDevicesSensor(coord, entry),
+        SpotifyBgColorSensor(coord, entry),
+        SpotifyFgColorSensor(coord, entry),
+    ])
 
 
 class _Base(CoordinatorEntity, SensorEntity):
@@ -63,6 +72,9 @@ class SpotifyNowPlayingSensor(_Base):
             "device": pb.get("device", {}).get("name"),
             "device_id": pb.get("device", {}).get("id"),
             "context_uri": (pb.get("context") or {}).get("uri"),
+            # Include colours here too for convenience
+            "background_color": self.coordinator.bg_color,
+            "foreground_color": self.coordinator.fg_color,
         }
 
 
@@ -81,3 +93,40 @@ class SpotifyDevicesSensor(_Base):
     @property
     def extra_state_attributes(self):
         return {"devices": self.coordinator.devices}
+
+
+class SpotifyBgColorSensor(_Base):
+    """Sensor exposing the extracted background colour as a hex string.
+
+    Cards read this sensor's state to set their background colour,
+    using the exact same node-vibrant result as HA's media control card.
+    """
+    _attr_name = "Background Color"
+    _attr_icon = "mdi:palette"
+
+    def __init__(self, coord, entry):
+        super().__init__(coord, entry)
+        self._attr_unique_id = f"{entry.entry_id}_bg_color"
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.bg_color or ""
+
+    @property
+    def extra_state_attributes(self):
+        return {"foreground_color": self.coordinator.fg_color}
+
+
+class SpotifyFgColorSensor(_Base):
+    """Sensor exposing the extracted foreground colour as a hex string."""
+
+    _attr_name = "Foreground Color"
+    _attr_icon = "mdi:palette-outline"
+
+    def __init__(self, coord, entry):
+        super().__init__(coord, entry)
+        self._attr_unique_id = f"{entry.entry_id}_fg_color"
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.fg_color or ""

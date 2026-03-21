@@ -66,3 +66,7 @@ ATTR_SHUFFLE = "shuffle"
 ATTR_REPEAT = "repeat"
 ATTR_TRACK_ID = "track_id"
 ATTR_PLAYLIST_ID = "playlist_id"
+
+# Colour extraction service
+COLOUR_SERVICE_URL_DEFAULT = "http://127.0.0.1:5174"
+CONF_COLOUR_SERVICE_URL = "colour_service_url"

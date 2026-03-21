@@ -50,6 +50,11 @@ class SpotifyEnhancedOAuth2FlowHandler(
         """Pass the required Spotify scopes."""
         return {"scope": SCOPE}
 
+
+    @staticmethod
+    def async_get_options_flow(config_entry):
+        return SpotifyEnhancedOptionsFlow(config_entry)
+
     async def async_oauth_create_entry(self, data: dict) -> dict:
         """Create the config entry after successful OAuth."""
         # Fetch the Spotify user to use as unique ID and title
@@ -72,4 +77,45 @@ class SpotifyEnhancedOAuth2FlowHandler(
         return self.async_create_entry(
             title=f"Spotify Enhanced ({display_name})",
             data=data,
+        )
+
+
+import voluptuous as vol
+from homeassistant import config_entries
+from homeassistant.core import callback
+
+
+@callback
+def async_get_options_flow_handler():
+    return SpotifyEnhancedOptionsFlow
+
+
+class SpotifyEnhancedOptionsFlow(config_entries.OptionsFlow):
+    """Options flow — lets user configure colour service URL and poll interval."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        from .const import COLOUR_SERVICE_URL_DEFAULT, CONF_COLOUR_SERVICE_URL
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({
+                vol.Optional(
+                    "update_interval",
+                    default=self.config_entry.options.get("update_interval", 3),
+                ): vol.All(int, vol.Range(min=1, max=30)),
+                vol.Optional(
+                    CONF_COLOUR_SERVICE_URL,
+                    default=self.config_entry.options.get(
+                        CONF_COLOUR_SERVICE_URL, COLOUR_SERVICE_URL_DEFAULT
+                    ),
+                ): str,
+            }),
+            description_placeholders={
+                "default_url": COLOUR_SERVICE_URL_DEFAULT,
+            },
         )
