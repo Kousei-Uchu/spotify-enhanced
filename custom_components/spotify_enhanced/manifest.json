@@ -1,7 +1,7 @@
 {
   "domain": "spotify_enhanced",
   "name": "Spotify Enhanced",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "documentation": "https://github.com/Kousei-Uchu/spotify-enhanced",
   "issue_tracker": "https://github.com/Kousei-Uchu/spotify-enhanced/issues",
   "requirements": ["spotipy>=2.23.0"],
