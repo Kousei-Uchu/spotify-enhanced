@@ -38,7 +38,9 @@ SUPPORTED = (
 )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+):
     coordinator: SpotifyDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities([SpotifyMediaPlayer(coordinator, entry)])
 
@@ -153,6 +155,10 @@ class SpotifyMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
                 "track_uri": item.get("uri"),
                 "context_uri": ctx.get("uri"),
             })
+        # Expose session cache for cards to use
+        session = self.coordinator.get_session_cache()
+        if session:
+            attrs["last_session"] = session
         return attrs
 
     def _active_device(self):

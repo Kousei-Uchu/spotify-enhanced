@@ -1,7 +1,6 @@
-"""HTTP API views for the Lovelace card."""
+"""HTTP API views for the Lovelace cards."""
 from __future__ import annotations
 import logging
-from aiohttp import web
 from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant
 from .const import DOMAIN
@@ -16,6 +15,7 @@ def async_register_views(hass: HomeAssistant):
     hass.http.register_view(SpotifyBrowseView)
     hass.http.register_view(SpotifyQueueView)
     hass.http.register_view(SpotifyLikedView)
+    hass.http.register_view(SpotifySessionView)
 
 
 def _coord(hass):
@@ -39,6 +39,7 @@ class SpotifySearchView(HomeAssistantView):
         try:
             return self.json(await c.api.search(query=q, types=types, limit=20))
         except Exception as e:
+            _LOGGER.error("Search error: %s", e)
             return self.json_message(str(e), 500)
 
 
@@ -67,8 +68,6 @@ class SpotifyPlaybackView(HomeAssistantView):
 
 
 class SpotifyQueueView(HomeAssistantView):
-    """Return the current playback queue."""
-
     url = "/api/spotify_enhanced/queue"
     name = "api:spotify_enhanced:queue"
 
@@ -85,8 +84,6 @@ class SpotifyQueueView(HomeAssistantView):
 
 
 class SpotifyLikedView(HomeAssistantView):
-    """Check if track IDs are in the user's Liked Songs."""
-
     url = "/api/spotify_enhanced/liked"
     name = "api:spotify_enhanced:liked"
 
@@ -95,8 +92,7 @@ class SpotifyLikedView(HomeAssistantView):
         c = _coord(hass)
         if not c:
             return self.json_message("Not configured", 503)
-        ids_raw = request.query.get("ids", "")
-        ids = [i.strip() for i in ids_raw.split(",") if i.strip()]
+        ids = [i.strip() for i in request.query.get("ids", "").split(",") if i.strip()]
         if not ids:
             return self.json([])
         try:
@@ -104,6 +100,20 @@ class SpotifyLikedView(HomeAssistantView):
             return self.json(result or [False] * len(ids))
         except Exception as e:
             return self.json_message(str(e), 500)
+
+
+class SpotifySessionView(HomeAssistantView):
+    """Return the cached session for cards to display last-played info."""
+    url = "/api/spotify_enhanced/session"
+    name = "api:spotify_enhanced:session"
+
+    async def get(self, request):
+        hass = request.app["hass"]
+        c = _coord(hass)
+        if not c:
+            return self.json_message("Not configured", 503)
+        session = c.get_session_cache()
+        return self.json(session or {})
 
 
 class SpotifyBrowseView(HomeAssistantView):

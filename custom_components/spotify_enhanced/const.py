@@ -30,6 +30,9 @@ CONF_TOKEN_INFO = "token_info"
 
 UPDATE_INTERVAL = 3
 
+# Session cache - persists last known playback state for 6 hours
+SESSION_CACHE_KEY = "spotify_enhanced_session"
+SESSION_CACHE_TTL = 21600  # seconds
 
 # Repeat modes (Spotify API values)
 REPEAT_OFF = "off"
@@ -50,6 +53,7 @@ SERVICE_SET_REPEAT = "set_repeat"
 SERVICE_SET_SHUFFLE = "set_shuffle"
 SERVICE_FOLLOW_PLAYLIST = "follow_playlist"
 SERVICE_UNFOLLOW_PLAYLIST = "unfollow_playlist"
+SERVICE_RESUME_SESSION = "resume_session"
 
 # Attribute names
 ATTR_DEVICE_ID = "device_id"
