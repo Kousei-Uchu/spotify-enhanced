@@ -16,6 +16,7 @@ def async_register_views(hass: HomeAssistant):
     hass.http.register_view(SpotifyQueueView)
     hass.http.register_view(SpotifyLikedView)
     hass.http.register_view(SpotifySessionView)
+    hass.http.register_view(SpotifyLyricsView)
 
 
 def _coord(hass):
@@ -114,6 +115,33 @@ class SpotifySessionView(HomeAssistantView):
             return self.json_message("Not configured", 503)
         session = c.get_session_cache()
         return self.json(session or {})
+
+
+class SpotifyLyricsView(HomeAssistantView):
+    """Proxy Spotify lyrics (via unofficial endpoint) for the lyrics card."""
+
+    url = "/api/spotify_enhanced/lyrics"
+    name = "api:spotify_enhanced:lyrics"
+
+    async def get(self, request):
+        hass = request.app["hass"]
+        c = _coord(hass)
+        if not c:
+            return self.json_message("Not configured", 503)
+        track_id = request.query.get("track_id", "").strip()
+        if not track_id:
+            return self.json_message("Missing track_id", 400)
+        try:
+            # Spotify's lyrics endpoint (sp_dc cookie approach via spotipy internals)
+            result = await c.api._run(
+                lambda sp: sp._get(f"track/{track_id}/lyrics")
+            )
+            lyrics = result.get("lyrics", {})
+            lines  = lyrics.get("lines", [])
+            return self.json({"lines": lines, "syncType": lyrics.get("syncType", "UNSYNCED")})
+        except Exception as e:
+            _LOGGER.debug("Lyrics fetch failed (normal if Premium not active): %s", e)
+            return self.json_message("Lyrics not available", 404)
 
 
 class SpotifyBrowseView(HomeAssistantView):
