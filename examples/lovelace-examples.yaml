@@ -1,0 +1,45 @@
+# Spotify Enhanced — Lovelace Examples
+
+# Full deck with all features
+- type: custom:spotify-enhanced-card
+  entity: media_player.spotify_enhanced
+
+# Full deck, controls only (no tabs)
+- type: custom:spotify-enhanced-card
+  entity: media_player.spotify_enhanced
+  show_library: false
+  show_search: false
+  show_devices: false
+  show_dj: false
+
+# Full deck with custom accent (matches a red HA theme)
+- type: custom:spotify-enhanced-card
+  entity: media_player.spotify_enhanced
+  accent_color: "var(--primary-color)"
+
+# Mini player
+- type: custom:spotify-mini-card
+  entity: media_player.spotify_enhanced
+  show_volume: true
+
+# Device picker
+- type: custom:spotify-device-card
+  entity: media_player.spotify_enhanced
+  title: "Spotify Connect Devices"
+
+# Mini + devices stacked
+- type: vertical-stack
+  cards:
+    - type: custom:spotify-mini-card
+      entity: media_player.spotify_enhanced
+    - type: custom:spotify-device-card
+      entity: media_player.spotify_enhanced
+      title: Switch Device
+
+# Side by side: mini left, devices right
+- type: horizontal-stack
+  cards:
+    - type: custom:spotify-mini-card
+      entity: media_player.spotify_enhanced
+    - type: custom:spotify-device-card
+      entity: media_player.spotify_enhanced

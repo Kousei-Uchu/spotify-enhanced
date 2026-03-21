@@ -1,0 +1,18 @@
+{
+  "services": {
+    "play_uri":           "mdi:play-circle-outline",
+    "search":             "mdi:magnify",
+    "transfer_playback":  "mdi:cast",
+    "start_dj":           "mdi:robot",
+    "dj_next_section":    "mdi:skip-next-circle-outline",
+    "dj_request":         "mdi:microphone",
+    "add_to_queue":       "mdi:playlist-plus",
+    "save_track":         "mdi:heart-outline",
+    "remove_track":       "mdi:heart-off-outline",
+    "seek":               "mdi:skip-forward",
+    "set_repeat":         "mdi:repeat",
+    "set_shuffle":        "mdi:shuffle",
+    "follow_playlist":    "mdi:playlist-check",
+    "unfollow_playlist":  "mdi:playlist-remove"
+  }
+}

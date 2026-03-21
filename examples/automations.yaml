@@ -1,0 +1,110 @@
+# Spotify Enhanced — Automation Examples
+
+# Play a playlist on arriving home
+- alias: "Spotify — Play on Arrival"
+  trigger:
+    platform: state
+    entity_id: person.you
+    to: home
+  condition:
+    - condition: time
+      after: "08:00:00"
+      before: "23:00:00"
+  action:
+    action: spotify_enhanced.play_uri
+    data:
+      context_uri: "spotify:playlist:YOUR_PLAYLIST_ID"
+
+# Start DJ at dinner time
+- alias: "Spotify — Dinner DJ"
+  trigger:
+    platform: time
+    at: "18:30:00"
+  action:
+    action: spotify_enhanced.start_dj
+
+# Transfer to bedroom speaker at bedtime
+- alias: "Spotify — Bedroom at Bedtime"
+  trigger:
+    platform: time
+    at: "22:00:00"
+  condition:
+    - condition: state
+      entity_id: media_player.spotify_enhanced
+      state: playing
+  action:
+    action: spotify_enhanced.transfer_playback
+    data:
+      device_id: >
+        {{ state_attr('sensor.spotify_enhanced_spotify_devices','devices')
+           | selectattr('name','eq','Bedroom Speaker')
+           | map(attribute='id') | first | default('') }}
+
+# Pause when everyone leaves
+- alias: "Spotify — Pause on Leaving"
+  trigger:
+    platform: state
+    entity_id: group.all_people
+    to: not_home
+  action:
+    action: media_player.media_pause
+    data:
+      entity_id: media_player.spotify_enhanced
+
+# Save currently playing track via button
+- alias: "Spotify — Save Current Track"
+  trigger:
+    platform: state
+    entity_id: input_button.save_track
+  condition:
+    - condition: template
+      value_template: "{{ state_attr('media_player.spotify_enhanced','track_id') is not none }}"
+  action:
+    - action: spotify_enhanced.save_track
+      data:
+        track_id:
+          - "{{ state_attr('media_player.spotify_enhanced','track_id') }}"
+    - action: notify.mobile_app_your_phone
+      data:
+        message: >
+          ❤️ Saved "{{ state_attr('media_player.spotify_enhanced','media_title') }}"
+
+# Gentle volume fade at night
+- alias: "Spotify — Night Fade"
+  trigger:
+    platform: time
+    at: "23:00:00"
+  action:
+    - repeat:
+        count: 8
+        sequence:
+          - action: media_player.volume_set
+            data:
+              entity_id: media_player.spotify_enhanced
+              volume_level: >
+                {{ [((state_attr('media_player.spotify_enhanced','volume_level')|float(0)) - 0.07), 0]|max }}
+          - delay: "00:01:00"
+    - action: media_player.media_pause
+      data:
+        entity_id: media_player.spotify_enhanced
+
+# Search and immediately play top result
+- alias: "Spotify — Play Search Result"
+  trigger:
+    platform: state
+    entity_id: input_button.spotify_search_go
+  action:
+    - action: spotify_enhanced.search
+      data:
+        query: "{{ states('input_text.spotify_search') }}"
+        search_type: [track]
+    - wait_for_trigger:
+        platform: event
+        event_type: spotify_enhanced_search_results
+      timeout: 10
+    - condition: template
+      value_template: "{{ wait.trigger is not none }}"
+    - action: spotify_enhanced.play_uri
+      data:
+        track_uri:
+          - "{{ wait.trigger.event.data.results.tracks.items[0].uri }}"

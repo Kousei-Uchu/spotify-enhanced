@@ -1,0 +1,205 @@
+play_uri:
+  name: Play URI
+  description: Start playback of a Spotify URI (track, album, playlist, artist).
+  fields:
+    context_uri:
+      name: Context URI
+      description: Spotify context URI (album, playlist, artist, show).
+      example: "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M"
+      selector:
+        text:
+    track_uri:
+      name: Track URI(s)
+      description: One or more Spotify track URIs to play directly.
+      example: "spotify:track:4uLU6hMCjMI75M1A2tKUQC"
+      selector:
+        object:
+    device_id:
+      name: Device ID
+      description: Spotify Connect device ID. Omit to use the currently active device.
+      selector:
+        text:
+    position_ms:
+      name: Start position (ms)
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 3600000
+          mode: box
+          unit_of_measurement: ms
+
+search:
+  name: Search
+  description: Search Spotify. Fires a spotify_enhanced_search_results event with results.
+  fields:
+    query:
+      name: Query
+      required: true
+      example: "Daft Punk"
+      selector:
+        text:
+    search_type:
+      name: Types
+      default: [track]
+      selector:
+        select:
+          multiple: true
+          options:
+            - track
+            - album
+            - artist
+            - playlist
+            - show
+            - episode
+
+transfer_playback:
+  name: Transfer Playback
+  description: Move playback to a different Spotify Connect device.
+  fields:
+    device_id:
+      name: Device ID
+      required: true
+      selector:
+        text:
+
+start_dj:
+  name: Start Spotify DJ
+  description: Start Spotify DJ mode on the active or specified device.
+  fields:
+    device_id:
+      name: Device ID
+      selector:
+        text:
+
+dj_next_section:
+  name: DJ — Skip Section
+  description: Skip to the next Spotify DJ section.
+  fields:
+    device_id:
+      name: Device ID
+      selector:
+        text:
+
+dj_request:
+  name: DJ — Make a Request
+  description: Search for a track matching the request and add it to the queue.
+  fields:
+    request_text:
+      name: Request
+      required: true
+      example: "something chill from the 90s"
+      selector:
+        text:
+    device_id:
+      name: Device ID
+      selector:
+        text:
+
+add_to_queue:
+  name: Add to Queue
+  description: Add a track to the current playback queue.
+  fields:
+    track_uri:
+      name: Track URI
+      required: true
+      example: "spotify:track:4uLU6hMCjMI75M1A2tKUQC"
+      selector:
+        text:
+    device_id:
+      name: Device ID
+      selector:
+        text:
+
+save_track:
+  name: Save Track(s)
+  description: Save one or more tracks to Liked Songs.
+  fields:
+    track_id:
+      name: Track ID(s)
+      required: true
+      selector:
+        object:
+
+remove_track:
+  name: Remove Track(s)
+  description: Remove one or more tracks from Liked Songs.
+  fields:
+    track_id:
+      name: Track ID(s)
+      required: true
+      selector:
+        object:
+
+seek:
+  name: Seek
+  description: Seek to a position in the current track.
+  fields:
+    position_ms:
+      name: Position (ms)
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 3600000
+          mode: box
+          unit_of_measurement: ms
+    device_id:
+      name: Device ID
+      selector:
+        text:
+
+set_repeat:
+  name: Set Repeat
+  description: Set the repeat mode.
+  fields:
+    repeat:
+      name: Repeat Mode
+      required: true
+      selector:
+        select:
+          options:
+            - label: "Off"
+              value: "off"
+            - label: "Repeat Track"
+              value: "track"
+            - label: "Repeat Context"
+              value: "context"
+    device_id:
+      name: Device ID
+      selector:
+        text:
+
+set_shuffle:
+  name: Set Shuffle
+  description: Enable or disable shuffle.
+  fields:
+    shuffle:
+      name: Shuffle
+      required: true
+      selector:
+        boolean:
+    device_id:
+      name: Device ID
+      selector:
+        text:
+
+follow_playlist:
+  name: Follow Playlist
+  description: Follow (save) a Spotify playlist to your library.
+  fields:
+    playlist_id:
+      name: Playlist ID
+      required: true
+      selector:
+        text:
+
+unfollow_playlist:
+  name: Unfollow Playlist
+  description: Unfollow (remove) a Spotify playlist from your library.
+  fields:
+    playlist_id:
+      name: Playlist ID
+      required: true
+      selector:
+        text:
