@@ -1,8 +1,8 @@
 /**
- * Spotify Enhanced Card  v1.1.6
- * All 20 issues addressed.
+ * Spotify Enhanced Card  v1.2.0
+ * Codeowner: Sorren (@Kousei-Uchu) — https://sorren.me
  */
-const VERSION = "1.1.6";
+const VERSION = "1.2.0";
 
 const fmt = (s) => {
   if (s == null || isNaN(s)) return "0:00";
@@ -15,7 +15,6 @@ const clamp   = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
 const round2  = n => Math.round(n * 100) / 100;
 const debounce = (fn,ms) => { let t; return (...a) => { clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
 
-// ── MDI icon names ────────────────────────────────────────────────────────────
 const I = {
   play:"mdi:play", pause:"mdi:pause", next:"mdi:skip-next", prev:"mdi:skip-previous",
   shuffle:"mdi:shuffle", shuffle_off:"mdi:shuffle-disabled",
@@ -31,13 +30,13 @@ const I = {
   account:"mdi:account-music", new_box:"mdi:new-box", playlist_play:"mdi:playlist-play",
 };
 
-// ha-icon-button wrapper — properly sized, centred
+// ha-icon-button — uses display:flex to centre icon correctly
 const Btn = (icon, id="", title="", cls="") =>
   `<ha-icon-button id="${id}" title="${title}" label="${title}" class="ctrl ${cls}">` +
   `<ha-icon icon="${icon}"></ha-icon></ha-icon-button>`;
 
 const Ico = (icon, size=20) =>
-  `<ha-icon icon="${icon}" style="--mdc-icon-size:${size}px;display:inline-flex;align-items:center;justify-content:center"></ha-icon>`;
+  `<ha-icon icon="${icon}" style="--mdc-icon-size:${size}px"></ha-icon>`;
 
 // ── Device stabiliser ────────────────────────────────────────────────────────
 const _devOrder = [];
@@ -68,8 +67,10 @@ function toggleLiked(id,hass) {
 }
 
 // ── Progress tracker ──────────────────────────────────────────────────────────
-// Uses HA's getCurrentProgress formula exactly, with latency compensation
-const LYRICS_LATENCY_MS = 300; // account for UI update delay
+// Uses HA's getCurrentProgress formula exactly.
+// Lyrics use currentForLyrics which adds 500ms to compensate for UI render latency
+// and then validates against the stateObj timestamp on every tick to prevent drift.
+const LYRICS_ADVANCE_MS = 500;
 
 class ProgressTracker {
   constructor() {
@@ -93,10 +94,8 @@ class ProgressTracker {
       ?clamp(this._pos+(Date.now()-this._updatedAt)/1000,0,this._dur||Infinity)
       :this._pos;
   }
-  // current + latency compensation for lyrics highlighting
-  get currentForLyrics() {
-    return this.current + LYRICS_LATENCY_MS/1000;
-  }
+  // For lyrics: advance by LYRICS_ADVANCE_MS to compensate UI latency
+  get currentForLyrics() { return this.current + LYRICS_ADVANCE_MS/1000; }
   _tick(){
     this._raf=null;if(!this._playing||this._drag)return;
     this._paint(this.current);
@@ -171,15 +170,11 @@ class Base extends HTMLElement {
   get _trackId(){return this._a.track_id??null;}
   get _ctxUri() {return this._a.context_uri??null;}
 
-  // Colours from sensors — consistent entity ID format
-  // Sensor name "Background Color" on device "Spotify Enhanced"
-  // → HA slugifies to sensor.spotify_enhanced_background_color
-  get _bgColor(){
-    return this._hass?.states?.["sensor.spotify_enhanced_background_color"]?.state||"";
-  }
-  get _fgColor(){
-    return this._hass?.states?.["sensor.spotify_enhanced_foreground_color"]?.state||"";
-  }
+  // Colour sensors — entity IDs are stable slugs based on sensor._attr_name
+  // "Background Color" on device "Spotify Enhanced" → sensor.spotify_enhanced_background_color
+  // "Foreground Color" on device "Spotify Enhanced" → sensor.spotify_enhanced_foreground_color
+  get _bgColor(){return this._hass?.states?.["sensor.spotify_enhanced_background_color"]?.state||"";}
+  get _fgColor(){return this._hass?.states?.["sensor.spotify_enhanced_foreground_color"]?.state||"";}
 
   _call(d,s,data={}){this._hass?.callService(d,s,data);}
   _spotify(s,d={}){this._call("spotify_enhanced",s,d);}
@@ -199,7 +194,7 @@ function applyBg(s,bg,fg,cardH){
   if(block)block.style.backgroundColor=bg||"";
   if(noimg)noimg.style.backgroundColor=bg||"";
   if(image){
-    if(bg) image.style.backgroundColor=bg;  // HA does this too — fills before image loads
+    if(bg)image.style.backgroundColor=bg;
     if(cardH)image.style.width=`${cardH}px`;
   }
   if(grad){
@@ -256,12 +251,23 @@ ha-card{overflow:hidden;height:100%;font-family:var(--paper-font-body1_-_font-fa
 .narrow .controls,.no-progress .controls{padding-bottom:0;}
 .no-progress.player:not(.no-controls){padding-bottom:0;}
 
-/* ha-icon-button — centred, correct sizes matching HA source */
+/* ha-icon-button — centred correctly.
+   display:flex + align/justify-content centres the inner ha-icon.
+   The ::part(button) selector resets the native button padding. */
 ha-icon-button{
   --mdc-icon-button-size:44px;
   --mdc-icon-size:28px;
   color:inherit;
-  display:inline-flex;align-items:center;justify-content:center;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  vertical-align:middle;
+}
+ha-icon-button::part(button){
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
 }
 ha-icon-button.pp{--mdc-icon-button-size:56px;--mdc-icon-size:40px;}
 ha-icon-button.sm{--mdc-icon-button-size:36px;--mdc-icon-size:20px;}
@@ -289,18 +295,17 @@ ha-icon-button.sm{--mdc-icon-button-size:36px;--mdc-icon-size:20px;}
 .mq-wrap{overflow:hidden;white-space:nowrap;}
 .mq{display:inline-block;padding-right:32px;}
 
-/* Panels — hidden when closed, overflow:hidden on card prevents bleed */
+/* Panels — display:none when closed to avoid overflow bleed */
 .backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.52);z-index:10;opacity:0;pointer-events:none;transition:opacity 0.25s;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
 .backdrop.open{opacity:1;pointer-events:auto;}
 .panel{position:absolute;bottom:0;left:0;right:0;z-index:11;display:none;flex-direction:column;overflow:hidden;transform:translateY(100%);transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);will-change:transform;}
 .panel.open{display:flex;transform:translateY(0);}
-/* Each panel has adaptive bg — set via JS from colour sensors */
 .panel-inner{display:flex;flex-direction:column;overflow:hidden;border-radius:14px 14px 0 0;flex:1;}
 #panel-search .panel-inner,#panel-queue .panel-inner{max-height:70vh;}
 #panel-lib .panel-inner,#panel-lyrics .panel-inner{max-height:80vh;}
 #panel-devices .panel-inner{max-height:60vh;}
 
-.ph{display:flex;align-items:center;justify-content:space-between;padding:8px 8px 6px 16px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.1);min-height:48px;}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 6px 16px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.1);min-height:48px;}
 .pt{font-size:0.76rem;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;opacity:0.6;display:flex;align-items:center;gap:4px;flex:1;overflow:hidden;}
 .pb-body{flex:1;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.15) transparent;}
 .pb-body::-webkit-scrollbar{width:3px;}
@@ -350,7 +355,7 @@ ha-icon-button.sm{--mdc-icon-button-size:36px;--mdc-icon-size:20px;}
 /* Queue now label */
 .qnow{padding:8px 14px 3px;font-size:0.63rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;opacity:0.55;}
 
-/* Lyrics — adaptive height, no empty space */
+/* Lyrics — adaptive height via flex, no empty space */
 .lline{padding:6px 20px;font-size:clamp(0.85rem,2.5vw,1rem);line-height:1.5;opacity:0.35;cursor:pointer;transition:opacity 0.3s,font-size 0.25s,font-weight 0.25s;border-radius:6px;}
 .lline.on{opacity:1;font-size:clamp(0.95rem,3vw,1.1rem);font-weight:700;}
 .lline.plain{opacity:0.45;cursor:default;}
@@ -358,7 +363,7 @@ ha-icon-button.sm{--mdc-icon-button-size:36px;--mdc-icon-size:20px;}
 
 .empty{text-align:center;padding:28px 16px;opacity:0.5;font-size:0.85rem;line-height:1.6;}
 .loading{text-align:center;padding:22px;opacity:0.5;font-size:0.82rem;}
-.play-all-btn{display:block;width:100%;padding:10px 14px;text-align:left;font-size:0.88rem;font-weight:600;background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:inherit;font-family:inherit;display:flex;align-items:center;gap:8px;}
+.play-all-btn{width:100%;padding:10px 14px;text-align:left;font-size:0.88rem;font-weight:600;background:rgba(255,255,255,0.08);border:none;cursor:pointer;color:inherit;font-family:inherit;display:flex;align-items:center;gap:8px;}
 .play-all-btn:hover{background:rgba(255,255,255,0.14);}
 `;
 
@@ -370,7 +375,7 @@ class SpotifyEnhancedCard extends Base {
     this._narrow=false;this._cardH=0;
     this._openId=null;
     this._libStack=[];this._srQ="";this._srR=null;this._srX={};
-    this._searchFocused=false;this._lyricsData=null;
+    this._searchFocused=false;this._lyricsData=null;this._lastLyricsTrack="";
     this._lastTrack="";this._lastBg="";this._lastFg="";this._lastH=0;
   }
 
@@ -400,15 +405,15 @@ class SpotifyEnhancedCard extends Base {
 <div class="player no-progress" id="player">
   <div class="top-info">
     <div style="display:inline-flex;align-items:center">
-      ${Btn(I.search, "btn-search","Search","sm")}
-      ${Btn(I.library,"btn-lib",   "Library","sm")}
-      ${Btn(I.cast,   "btn-devices","Devices","sm")}
+      ${Btn(I.search, "btn-search",  "Search",  "sm")}
+      ${Btn(I.library,"btn-lib",     "Library", "sm")}
+      ${Btn(I.cast,   "btn-devices", "Devices", "sm")}
     </div>
     <div style="display:inline-flex;align-items:center">
-      ${Btn(I.heart_out,"like-btn",  "Save to Liked Songs","sm")}
-      ${Btn(I.mic_on,   "btn-lyrics","Lyrics","sm")}
-      ${Btn(I.queue,    "btn-queue", "Queue","sm")}
-      ${Btn(I.dots,     "btn-more",  "More info","sm")}
+      ${Btn(I.heart_out,"like-btn",   "Save to Liked Songs","sm")}
+      ${Btn(I.mic_on,   "btn-lyrics", "Lyrics",             "sm")}
+      ${Btn(I.queue,    "btn-queue",  "Queue",              "sm")}
+      ${Btn(I.dots,     "btn-more",   "More info",          "sm")}
     </div>
   </div>
 
@@ -422,11 +427,11 @@ class SpotifyEnhancedCard extends Base {
       </div>
       <div class="controls">
         <div class="start">
-          ${Btn(I.shuffle_off,"shuf-btn","Shuffle","")}
-          ${Btn(I.prev,       "prev-btn","Previous","")}
+          ${Btn(I.shuffle_off,"shuf-btn","Shuffle",   "")}
+          ${Btn(I.prev,       "prev-btn","Previous",  "")}
           ${Btn(I.play,       "play-btn","Play/Pause","pp")}
-          ${Btn(I.next,       "next-btn","Next","")}
-          ${Btn(I.repeat_off, "rep-btn", "Repeat","")}
+          ${Btn(I.next,       "next-btn","Next",      "")}
+          ${Btn(I.repeat_off, "rep-btn", "Repeat",    "")}
         </div>
         <div class="end"></div>
       </div>
@@ -515,7 +520,6 @@ class SpotifyEnhancedCard extends Base {
     this._cardH=card.offsetHeight;
     this.shadowRoot.getElementById("player")?.classList.toggle("narrow",this._narrow);
     applyBg(this.shadowRoot,this._bgColor,this._fgColor,this._cardH);
-    // Update panel inner backgrounds to match card
     this._applyPanelColors();
   }
 
@@ -564,7 +568,7 @@ class SpotifyEnhancedCard extends Base {
     s.getElementById("si")?.addEventListener("keydown",e=>{if(e.key==="Enter")this._search();});
     s.getElementById("sg")?.addEventListener("click",()=>this._search());
 
-    // Hover icon preview
+    // Hover: show what clicking will do
     const shuf=s.getElementById("shuf-btn");
     shuf?.addEventListener("mouseenter",()=>shuf.querySelector("ha-icon")?.setAttribute("icon",this._shuffle?I.shuffle_off:I.shuffle));
     shuf?.addEventListener("mouseleave",()=>this._paintShuf());
@@ -590,9 +594,12 @@ class SpotifyEnhancedCard extends Base {
     this._applyPanelColors();
     if(id==="queue")   this._loadQueue();
     if(id==="devices") this._renderDevices();
-    if(id==="lyrics")  { if(this._trackId!==this._lastLyricsTrack) this._loadLyrics(); else this._highlightLyric(); }
-    if(id==="lib"&&!this._libStack.length)this._renderLibRoot();
-    if(id==="search")requestAnimationFrame(()=>{s.getElementById("si")?.focus();if(this._srR)this._renderSearch();});
+    if(id==="lyrics"){
+      if(this._trackId!==this._lastLyricsTrack) this._loadLyrics();
+      else this._highlightLyric();
+    }
+    if(id==="lib"&&!this._libStack.length) this._renderLibRoot();
+    if(id==="search") requestAnimationFrame(()=>{s.getElementById("si")?.focus();if(this._srR)this._renderSearch();});
   }
 
   _close(){
@@ -637,7 +644,6 @@ class SpotifyEnhancedCard extends Base {
     if(this._trackId!==this._lastTrack){
       this._lastTrack=this._trackId;
       checkLiked(this._trackId,this._hass).then(()=>this._paintLike(_liked.has(this._trackId)));
-      // Reload lyrics if panel is open and track changed
       if(this._openId==="lyrics")this._loadLyrics();
     }
     this._paintLike(_liked.has(this._trackId));
@@ -658,13 +664,13 @@ class SpotifyEnhancedCard extends Base {
   _renderLibRoot(){
     const body=this.shadowRoot.getElementById("lb");if(!body)return;
     const roots=[
-      ["spotify://category/playlists",       I.library,  "Playlists",       true],
-      ["spotify://category/liked_songs",      I.heart,    "Liked Songs",     true],
-      ["spotify://category/recently_played",  I.history,  "Recently Played", false],
-      ["spotify://category/top_tracks",       I.chart,    "Top Tracks",      false],
-      ["spotify://category/top_artists",      I.account,  "Top Artists",     true],
-      ["spotify://category/new_releases",     I.new_box,  "New Releases",    true],
-      ["spotify://category/discover_weekly",  I.compass,  "Discover Weekly", true],
+      ["spotify://category/playlists",       I.library, "Playlists",       true],
+      ["spotify://category/liked_songs",     I.heart,   "Liked Songs",     true],
+      ["spotify://category/recently_played", I.history, "Recently Played", true],
+      ["spotify://category/top_tracks",      I.chart,   "Top Tracks",      true],
+      ["spotify://category/top_artists",     I.account, "Top Artists",     true],
+      ["spotify://category/new_releases",    I.new_box, "New Releases",    true],
+      ["spotify://category/discover_weekly", I.compass, "Discover Weekly", true],
     ];
     body.innerHTML=roots.map(([id,ico,label,exp])=>`
       <div class="item" data-id="${id}" data-exp="${exp}" data-label="${label}">
@@ -693,6 +699,13 @@ class SpotifyEnhancedCard extends Base {
       this._mp("play_media",{media_content_id:btn.dataset.playAll,media_content_type:"music"});
       this._close();
     }));
+    // Play playlist with offset (play from specific track)
+    c.querySelectorAll("[data-play-ctx]").forEach(btn=>btn.addEventListener("click",e=>{
+      e.stopPropagation();
+      const{playCtx,playOffset}=btn.dataset;
+      this._mp("play_media",{media_content_id:playCtx,media_content_type:"music"});
+      this._close();
+    }));
   }
 
   async _browseLib(id){
@@ -702,9 +715,8 @@ class SpotifyEnhancedCard extends Base {
       const r=await this._hass.callWS({type:"media_player/browse_media",entity_id:this._config.entity,media_content_id:id,media_content_type:"music"});
       const items=r.children||[];
       let html="";
-      // For playlists/albums — show a "Play all" button at the top
       if(r.can_play&&r.media_content_id&&!r.media_content_id.startsWith("spotify://category")){
-        html+=`<button class="play-all-btn" data-play-all="${r.media_content_id}">${Ico(I.play,18)}&nbsp;Play all</button>`;
+        html+=`<button class="play-all-btn" data-play-all="${r.media_content_id}">${Ico(I.play_box,18)}&nbsp;Play all</button>`;
       }
       html+=items.map(item=>{
         const isA=item.media_class==="artist";
@@ -842,7 +854,9 @@ class SpotifyEnhancedCard extends Base {
     if(!this._title||!this._artist){body.innerHTML=`<div class="empty">No track playing.</div>`;return;}
     try{
       const p=new URLSearchParams({track_name:this._title,artist_name:this._artist,album_name:this._album||"",duration:Math.round(this._durSecs)});
-      const r=await fetch(`https://lrclib.net/api/get?${p}`,{headers:{"Lrclib-Client":"SpotifyEnhancedHA/1.1.6 (https://github.com/Kousei-Uchu/spotify-enhanced)","Accept":"application/json"}});
+      const r=await fetch(`https://lrclib.net/api/get?${p}`,{
+        headers:{"Lrclib-Client":"SpotifyEnhancedHA/1.2.0 (https://github.com/Kousei-Uchu/spotify-enhanced)","Accept":"application/json"}
+      });
       const data=await r.json().catch(()=>null);
       if(!data||data.code==="TrackNotFound"||(!data.syncedLyrics&&!data.plainLyrics&&!data.instrumentalFlag)){throw new Error("not found");}
       if(data.instrumentalFlag){
@@ -871,26 +885,41 @@ class SpotifyEnhancedCard extends Base {
     const lines=body.querySelectorAll(".lline[data-t]");
     let active=null;
     lines.forEach(el=>{el.classList.remove("on");if(parseInt(el.dataset.t)<=nowMs)active=el;});
-    if(active){active.classList.add("on");active.scrollIntoView({behavior:"smooth",block:"center"});}
+    if(active){
+      active.classList.add("on");
+      // Scroll within the panel body only — not the whole page
+      const panelBody=body.parentElement;
+      if(panelBody){
+        const elTop=active.offsetTop;
+        const elH=active.offsetHeight;
+        const pHeight=panelBody.clientHeight;
+        const target=elTop-(pHeight/2)+(elH/2);
+        panelBody.scrollTo({top:Math.max(0,target),behavior:"smooth"});
+      }
+    }
   }
 }
 customElements.define("spotify-enhanced-card",SpotifyEnhancedCard);
 
-// ── MINI CARD ─────────────────────────────────────────────────────────────────
+// ── MINI CARD — shows seek bar, not volume ────────────────────────────────────
 class SpotifyMiniCard extends Base {
+  constructor(){super();this._prog=null;this._vd=null;}
+  static getConfigElement(){return document.createElement("spotify-mini-card-editor");}
   static getStubConfig(){return{entity:"media_player.spotify_enhanced"};}
-  setConfig(c){this._config={show_volume:true,...c};this._ready=false;this._build();this._ready=true;if(this._hass)this._update(null);}
+  setConfig(c){this._config={show_seek:true,show_volume:false,...c};this._ready=false;this._build();this._ready=true;if(this._hass)this._update(null);}
+  disconnectedCallback(){this._prog?.destroy();}
+
   _build(){
     this.shadowRoot.innerHTML=`<style>${CSS}
-ha-card{display:flex;align-items:center;padding:10px 12px;gap:10px;height:auto;overflow:hidden;}
+ha-card{display:flex;align-items:center;padding:10px 12px;gap:10px;height:auto;overflow:hidden;position:relative;}
 .art{width:48px;height:48px;border-radius:4px;object-fit:cover;flex-shrink:0;background:rgba(255,255,255,0.1);}
 .inf{flex:1;min-width:0;}
 .tt{font-size:0.9rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ss{font-size:0.74rem;opacity:0.65;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.vr{display:flex;align-items:center;gap:4px;margin-top:5px;}
-.vr .vol-track{flex:1;}
+.seek-wrap{margin-top:5px;}
 .ctrls{display:inline-flex;align-items:center;flex-shrink:0;}
 ha-icon-button{--mdc-icon-button-size:36px;--mdc-icon-size:22px;color:inherit;display:inline-flex;align-items:center;justify-content:center;}
+ha-icon-button::part(button){display:flex;align-items:center;justify-content:center;padding:0;}
 ha-icon-button.pp{--mdc-icon-button-size:44px;--mdc-icon-size:30px;}
 </style>
 <ha-card>
@@ -898,9 +927,12 @@ ha-icon-button.pp{--mdc-icon-button-size:44px;--mdc-icon-size:30px;}
   <div class="inf">
     <div class="tt" id="tt">Nothing playing</div>
     <div class="ss" id="ss"></div>
-    <div class="vr" id="vr">
-      ${Btn(I.vol_lo,"mute","Mute","")}
-      <div class="vol-track" id="vt"><div class="vol-fill" id="vf"></div><div class="vol-thumb" id="vh"></div></div>
+    <div class="seek-wrap" id="seek-wrap">
+      <div class="prog-bar" id="prog-bar">
+        <div class="prog-fill" id="prog-fill"></div>
+        <div class="prog-thumb" id="prog-thumb"></div>
+      </div>
+      <div class="prog-times"><span id="pcur">0:00</span><span id="pdur">0:00</span></div>
     </div>
   </div>
   <div class="ctrls">
@@ -913,19 +945,41 @@ ha-icon-button.pp{--mdc-icon-button-size:44px;--mdc-icon-size:30px;}
     s.getElementById("play").addEventListener("click",()=>this._mp(this._playing?"media_pause":"media_play"));
     s.getElementById("prev").addEventListener("click",()=>this._mp("media_previous_track"));
     s.getElementById("next").addEventListener("click",()=>this._mp("media_next_track"));
-    s.getElementById("mute").addEventListener("click",()=>this._mp("volume_mute",{is_volume_muted:!this._muted}));
-    this._vd=new VolDrag(s.getElementById("vt"),s.getElementById("vf"),s.getElementById("vh"),p=>this._mp("volume_set",{volume_level:round2(p)}));
+
+    this._prog=new ProgressTracker();
+    this._prog.fillEl =s.getElementById("prog-fill");
+    this._prog.thumbEl=s.getElementById("prog-thumb");
+    this._prog.curEl  =s.getElementById("pcur");
+    this._prog.durEl  =s.getElementById("pdur");
+
+    const bar=s.getElementById("prog-bar");
+    if(bar){
+      const pct=e=>{const r=bar.getBoundingClientRect();return clamp((e.clientX-r.left)/r.width,0,1);};
+      bar.addEventListener("pointerdown",e=>{
+        bar.classList.add("drag");bar.setPointerCapture(e.pointerId);this._prog.startDrag(pct(e));
+        const mv=e=>this._prog.moveDrag(pct(e));
+        const up=()=>{bar.classList.remove("drag");const s=this._prog.endDrag();this._mp("media_seek",{seek_position:round2(s)});bar.removeEventListener("pointermove",mv);bar.removeEventListener("pointerup",up);};
+        bar.addEventListener("pointermove",mv,{passive:true});
+        bar.addEventListener("pointerup",up,{once:true});
+      });
+    }
   }
+
   _update(){
     const s=this.shadowRoot;if(!s.getElementById("art"))return;
     s.getElementById("art").src=this._hassUrl(this._art);
     s.getElementById("tt").textContent=this._title||"Nothing playing";
     s.getElementById("ss").textContent=this._artist;
     s.getElementById("play")?.querySelector("ha-icon")?.setAttribute("icon",this._playing?I.pause:I.play);
-    s.getElementById("mute")?.querySelector("ha-icon")?.setAttribute("icon",this._muted?I.vol_off:I.vol_lo);
-    s.getElementById("vr").style.display=this._config.show_volume!==false?"flex":"none";
-    this._vd?.sync(this._muted?0:this._vol/100);
-    const card=s.querySelector("ha-card");const bg=this._bgColor,fg=this._fgColor;
+
+    const so=this._so;
+    const showP=this._config.show_seek!==false&&(this._playing||this._state==="paused")&&this._durSecs>0;
+    s.getElementById("seek-wrap").style.display=showP?"":"none";
+    if(showP&&so)this._prog?.sync(so);
+
+    // Colour — same logic as other standalone cards
+    const card=s.querySelector("ha-card");
+    const bg=this._bgColor,fg=this._fgColor;
     if(card&&bg)card.style.backgroundColor=bg;
     const inf=s.querySelector(".inf"),ctrls=s.querySelector(".ctrls");
     if(fg){if(inf)inf.style.color=fg;if(ctrls)ctrls.style.color=fg;}
@@ -933,8 +987,8 @@ ha-icon-button.pp{--mdc-icon-button-size:44px;--mdc-icon-size:30px;}
 }
 customElements.define("spotify-mini-card",SpotifyMiniCard);
 
-// ── Shared standalone bg helper ───────────────────────────────────────────────
-const BG_TEMPLATE = () => `
+// ── Shared background template ────────────────────────────────────────────────
+const BG_TEMPLATE=()=>`
   <div class="background no-image off" id="bg">
     <div class="color-block" id="color-block"></div>
     <div class="no-img" id="no-img"></div>
@@ -944,6 +998,7 @@ const BG_TEMPLATE = () => `
 
 // ── DEVICE CARD ───────────────────────────────────────────────────────────────
 class SpotifyDeviceCard extends Base {
+  static getConfigElement(){return document.createElement("spotify-device-card-editor");}
   static getStubConfig(){return{entity:"media_player.spotify_enhanced",title:"Spotify Devices"};}
   setConfig(c){this._config={title:"Spotify Devices",...c};this._ready=false;this._build();this._ready=true;if(this._hass)this._update(null);}
   _build(){
@@ -980,6 +1035,7 @@ customElements.define("spotify-device-card",SpotifyDeviceCard);
 // ── SEARCH CARD ───────────────────────────────────────────────────────────────
 class SpotifySearchCard extends Base {
   constructor(){super();this._q="";this._r=null;this._x={};this._focused=false;}
+  static getConfigElement(){return document.createElement("spotify-search-card-editor");}
   static getStubConfig(){return{entity:"media_player.spotify_enhanced"};}
   setConfig(c){this._config=c;this._ready=false;this._build();this._ready=true;if(this._hass)this._update(null);}
   _build(){
@@ -1039,14 +1095,17 @@ customElements.define("spotify-search-card",SpotifySearchCard);
 // ── QUEUE CARD ────────────────────────────────────────────────────────────────
 class SpotifyQueueCard extends Base {
   constructor(){super();this._data=null;this._loading=false;this._lastTrack="";}
+  static getConfigElement(){return document.createElement("spotify-queue-card-editor");}
   static getStubConfig(){return{entity:"media_player.spotify_enhanced"};}
   setConfig(c){this._config=c;this._ready=false;this._build();this._ready=true;if(this._hass)this._update(null);}
   _build(){
     this.shadowRoot.innerHTML=`<style>${CSS}
 ha-card{height:auto;display:flex;flex-direction:column;max-height:600px;}
 .inner{position:relative;z-index:1;display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;}
-.hdr{padding:10px 8px 6px 14px;font-size:0.82rem;font-weight:700;opacity:0.7;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.hdr{padding:10px 4px 6px 14px;font-size:0.82rem;font-weight:700;opacity:0.7;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .body{overflow-y:auto;flex:1;scrollbar-width:thin;}
+ha-icon-button{--mdc-icon-button-size:36px;--mdc-icon-size:20px;color:inherit;display:inline-flex;align-items:center;justify-content:center;}
+ha-icon-button::part(button){display:flex;align-items:center;justify-content:center;padding:0;}
 </style>
 <ha-card>${BG_TEMPLATE()}
   <div class="inner">
@@ -1114,6 +1173,7 @@ customElements.define("spotify-queue-card",SpotifyQueueCard);
 // ── LYRICS CARD ───────────────────────────────────────────────────────────────
 class SpotifyLyricsCard extends Base {
   constructor(){super();this._data=null;this._lastTrack="";this._prog=new ProgressTracker();}
+  static getConfigElement(){return document.createElement("spotify-lyrics-card-editor");}
   static getStubConfig(){return{entity:"media_player.spotify_enhanced"};}
   setConfig(c){this._config=c;this._ready=false;this._build();this._ready=true;if(this._hass)this._update(null);}
   disconnectedCallback(){this._prog?.destroy();}
@@ -1138,7 +1198,9 @@ ha-card{height:auto;display:flex;flex-direction:column;max-height:500px;}
     if(!this._title||!this._artist){body.innerHTML=`<div class="empty">No track playing.</div>`;return;}
     try{
       const p=new URLSearchParams({track_name:this._title,artist_name:this._artist,album_name:this._album||"",duration:Math.round(this._durSecs)});
-      const r=await fetch(`https://lrclib.net/api/get?${p}`,{headers:{"Lrclib-Client":"SpotifyEnhancedHA/1.1.6 (https://github.com/Kousei-Uchu/spotify-enhanced)","Accept":"application/json"}});
+      const r=await fetch(`https://lrclib.net/api/get?${p}`,{
+        headers:{"Lrclib-Client":"SpotifyEnhancedHA/1.2.0 (https://github.com/Kousei-Uchu/spotify-enhanced)","Accept":"application/json"}
+      });
       const data=await r.json().catch(()=>null);
       if(!data||data.code==="TrackNotFound"||(!data.syncedLyrics&&!data.plainLyrics&&!data.instrumentalFlag))throw new Error("not found");
       if(data.instrumentalFlag){body.innerHTML=`<div class="empty">${Ico(I.mic_on,28)}<br><br>Instrumental — no lyrics.</div>`;return;}
@@ -1155,11 +1217,17 @@ ha-card{height:auto;display:flex;flex-direction:column;max-height:500px;}
     }catch{body.innerHTML=`<div class="empty">${Ico(I.mic_off,28)}<br><br>Lyrics not available.</div>`;}
   }
   _highlight(){
-    const body=this.shadowRoot.getElementById("body");if(!body||!this._data||!this._prog)return;
+    const panelBody=this.shadowRoot.getElementById("body");if(!panelBody||!this._data||!this._prog)return;
     const nowMs=this._prog.currentForLyrics*1000;
-    const lines=body.querySelectorAll(".lline[data-t]");let active=null;
+    const lines=panelBody.querySelectorAll(".lline[data-t]");let active=null;
     lines.forEach(el=>{el.classList.remove("on");if(parseInt(el.dataset.t)<=nowMs)active=el;});
-    if(active){active.classList.add("on");active.scrollIntoView({behavior:"smooth",block:"center"});}
+    if(active){
+      active.classList.add("on");
+      const elTop=active.offsetTop;
+      const elH=active.offsetHeight;
+      const pHeight=panelBody.clientHeight;
+      panelBody.scrollTo({top:Math.max(0,elTop-(pHeight/2)+(elH/2)),behavior:"smooth"});
+    }
   }
   _update(){
     const s=this.shadowRoot,so=this._so,tid=this._trackId;
@@ -1171,33 +1239,50 @@ ha-card{height:auto;display:flex;flex-direction:column;max-height:500px;}
 }
 customElements.define("spotify-lyrics-card",SpotifyLyricsCard);
 
-// ── VISUAL EDITOR ─────────────────────────────────────────────────────────────
-class SpotifyEnhancedCardEditor extends HTMLElement {
-  set hass(h){this._hass=h;const p=this.querySelector("ha-entity-picker");if(p)p.hass=h;}
-  setConfig(c){this._config=c;this._render();}
-  _render(){
-    const c=this._config||{};
-    const tog=(k,label,def=true)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--divider-color,#eee)"><span>${label}</span><ha-switch data-key="${k}" ${c[k]!==false&&(c[k]!==undefined?c[k]:def)?"checked":""}></ha-switch></div>`;
-    this.innerHTML=`<style>:host{display:block;padding:4px 0}ha-entity-picker{display:block;margin-bottom:14px}.sh{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--secondary-text-color);margin:12px 0 4px}</style>
-      <ha-entity-picker .hass="${this._hass||null}" .value="${c.entity||""}" .includeDomains="${["media_player"]}" label="Spotify Media Player Entity"></ha-entity-picker>
-      <div class="sh">Controls</div>
-      ${tog("show_seek","Show seek bar")}${tog("show_volume","Show volume")}${tog("show_shuffle","Show shuffle")}${tog("show_repeat","Show repeat")}`;
-    const p=this.querySelector("ha-entity-picker");
-    if(p){p.hass=this._hass;p.addEventListener("value-changed",e=>this._set("entity",e.detail.value));}
-    this.querySelectorAll("ha-switch[data-key]").forEach(sw=>sw.addEventListener("change",e=>this._set(sw.dataset.key,e.target.checked)));
+// ── VISUAL EDITORS ────────────────────────────────────────────────────────────
+// Generic editor factory — reused for all card types
+function makeEditor(name, extraToggles=[]) {
+  class Editor extends HTMLElement {
+    set hass(h){this._hass=h;const p=this.querySelector("ha-entity-picker");if(p)p.hass=h;}
+    setConfig(c){this._config=c;this._render();}
+    _render(){
+      const c=this._config||{};
+      const tog=(k,label,def=true)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--divider-color,#eee)"><span>${label}</span><ha-switch data-key="${k}" ${c[k]!==false&&(c[k]!==undefined?c[k]:def)?"checked":""}></ha-switch></div>`;
+      const extras=extraToggles.map(([k,l,d])=>tog(k,l,d)).join("");
+      this.innerHTML=`<style>:host{display:block;padding:4px 0}ha-entity-picker{display:block;margin-bottom:14px}.sh{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--secondary-text-color);margin:12px 0 4px}</style>
+        <ha-entity-picker .hass="${this._hass||null}" .value="${c.entity||""}" .includeDomains="${["media_player"]}" label="Spotify Media Player Entity"></ha-entity-picker>
+        ${extras?`<div class="sh">Options</div>${extras}`:""}`;
+      const p=this.querySelector("ha-entity-picker");
+      if(p){p.hass=this._hass;p.addEventListener("value-changed",e=>this._set("entity",e.detail.value));}
+      this.querySelectorAll("ha-switch[data-key]").forEach(sw=>sw.addEventListener("change",e=>this._set(sw.dataset.key,e.target.checked)));
+    }
+    _set(k,v){this._config={...this._config,[k]:v};this.dispatchEvent(new CustomEvent("config-changed",{detail:{config:this._config}}));}
   }
-  _set(k,v){this._config={...this._config,[k]:v};this.dispatchEvent(new CustomEvent("config-changed",{detail:{config:this._config}}));}
+  customElements.define(name,Editor);
 }
-customElements.define("spotify-enhanced-card-editor",SpotifyEnhancedCardEditor);
+
+makeEditor("spotify-enhanced-card-editor",[
+  ["show_seek",    "Show seek bar",  true],
+  ["show_volume",  "Show volume",    true],
+  ["show_shuffle", "Show shuffle",   true],
+  ["show_repeat",  "Show repeat",    true],
+]);
+makeEditor("spotify-mini-card-editor",[
+  ["show_seek",   "Show seek bar", true],
+]);
+makeEditor("spotify-device-card-editor",[]);
+makeEditor("spotify-search-card-editor",[]);
+makeEditor("spotify-queue-card-editor", []);
+makeEditor("spotify-lyrics-card-editor",[]);
 
 // ── Registration ──────────────────────────────────────────────────────────────
 window.customCards=window.customCards||[];
 window.customCards.push(
-  {type:"spotify-enhanced-card",name:"Spotify Enhanced — Media Deck",   description:"Full player with art, controls, library, search, queue, devices and lyrics.",preview:true},
-  {type:"spotify-mini-card",    name:"Spotify Enhanced — Mini Player",  description:"Compact single-row playback control.",preview:true},
-  {type:"spotify-device-card",  name:"Spotify Enhanced — Device Picker",description:"Spotify Connect device switcher.",preview:true},
-  {type:"spotify-search-card",  name:"Spotify Enhanced — Search",       description:"Standalone Spotify search.",preview:true},
-  {type:"spotify-queue-card",   name:"Spotify Enhanced — Queue",        description:"Queue viewer with swipe-to-remove.",preview:true},
-  {type:"spotify-lyrics-card",  name:"Spotify Enhanced — Lyrics",       description:"Time-synced lyrics via lrclib.net.",preview:true},
+  {type:"spotify-enhanced-card", name:"Spotify Enhanced — Media Deck",    description:"Full player with art, controls, library, search, queue, devices and lyrics.",preview:true},
+  {type:"spotify-mini-card",     name:"Spotify Enhanced — Mini Player",   description:"Compact player with seek bar.",preview:true},
+  {type:"spotify-device-card",   name:"Spotify Enhanced — Device Picker", description:"Spotify Connect device switcher.",preview:true},
+  {type:"spotify-search-card",   name:"Spotify Enhanced — Search",        description:"Standalone Spotify search.",preview:true},
+  {type:"spotify-queue-card",    name:"Spotify Enhanced — Queue",         description:"Queue viewer with swipe-to-remove.",preview:true},
+  {type:"spotify-lyrics-card",   name:"Spotify Enhanced — Lyrics",        description:"Time-synced lyrics via lrclib.net.",preview:true},
 );
 console.info(`%c SPOTIFY ENHANCED %c v${VERSION} `,"color:#fff;background:#1DB954;font-weight:700;padding:2px 6px;border-radius:3px 0 0 3px","color:#1DB954;background:#111;font-weight:700;padding:2px 6px;border-radius:0 3px 3px 0");

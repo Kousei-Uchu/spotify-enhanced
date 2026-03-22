@@ -1,82 +1,81 @@
-# Docker / Container Installation
+# Docker Installation Guide
 
-## Quick install
+This guide covers installing Spotify Enhanced alongside a Dockerised Home Assistant instance.
+
+**Maintainer:** Sorren ([@Kousei-Uchu](https://github.com/Kousei-Uchu)) — [sorren.me](https://sorren.me)
+
+---
+
+## Home Assistant Docker setup
+
+If you're running HA in Docker, your config directory is mounted as a volume. Typically:
 
 ```bash
-# Assuming your HA config is at /path/to/config on the host:
-git clone https://github.com/Kousei-Uchu/spotify-enhanced.git
-cd spotify-enhanced
-./install.sh /path/to/config
+docker run -d \
+  --name homeassistant \
+  -v /path/to/ha-config:/config \
+  -p 8123:8123 \
+  ghcr.io/home-assistant/home-assistant:stable
+```
+
+Your config directory is at `/path/to/ha-config`.
+
+---
+
+## Installing the integration
+
+```bash
+# Copy the custom component
+cp -r custom_components/spotify_enhanced /path/to/ha-config/custom_components/
+
+# Restart HA
 docker restart homeassistant
 ```
 
-## Docker Compose example
+---
+
+## Colour service with Docker Compose
+
+The easiest way to run both HA and the colour service together:
 
 ```yaml
+version: "3.8"
+
 services:
   homeassistant:
-    container_name: homeassistant
     image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
     volumes:
-      - /path/to/config:/config
-      - /etc/localtime:/etc/localtime:ro
+      - ./ha-config:/config
+    ports:
+      - "8123:8123"
     restart: unless-stopped
     network_mode: host
+
+  spotify-colour:
+    image: node:20-alpine
+    container_name: spotify-colour
+    working_dir: /app
+    volumes:
+      - ./colour-service:/app
+    command: sh -c "npm install && npm run build && node dist/server.js"
+    restart: unless-stopped
+    network_mode: host   # shares host network so HA can reach 127.0.0.1:5174
     environment:
-      - TZ=Australia/Sydney
+      - PORT=5174
 ```
 
-After `docker compose up -d` your config is at `/path/to/config`.
+With `network_mode: host`, both containers share the host network, so the coordinator can reach the colour service at `http://127.0.0.1:5174`.
 
-## Setting HA's URL (important for OAuth)
+---
 
-In `/path/to/config/configuration.yaml`:
-```yaml
-homeassistant:
-  internal_url: "http://192.168.1.100:8123"
-  # If you have external access:
-  external_url: "https://ha.yourdomain.com"
-```
-
-Or set it in the UI: **Settings → System → Network → Home Assistant URL**.
-
-The OAuth redirect URI is built from this URL. Set it before running the integration setup.
-
-## Python dependency
-
-`spotipy` is auto-installed by HA on startup. If you see `ModuleNotFoundError`:
+## Verifying the setup
 
 ```bash
-docker exec homeassistant pip install spotipy
-docker restart homeassistant
-```
+# Check colour service is accessible from inside the HA container
+docker exec homeassistant wget -qO- http://127.0.0.1:5174/health
+# Should return: {"ok":true,"version":"1.0.0"}
 
-## Reverse proxy (NGINX / Traefik)
-
-The OAuth callback path `/auth/external/callback` flows through the standard HA reverse proxy config with no extra rules needed.
-
-### NGINX example
-```nginx
-server {
-    listen 443 ssl;
-    server_name ha.yourdomain.com;
-
-    location / {
-        proxy_pass http://192.168.1.100:8123;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-    }
-}
-```
-
-Set `external_url: "https://ha.yourdomain.com"` in HA and use `https://ha.yourdomain.com/auth/external/callback` as the Spotify Redirect URI.
-
-## Checking logs
-```bash
-docker logs homeassistant 2>&1 | grep -i "spotify"
+# Check integration loaded
+docker exec homeassistant grep -r "spotify_enhanced" /config/home-assistant.log | tail -5
 ```
