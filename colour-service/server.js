@@ -108,22 +108,24 @@ function rgbToHex(rgb) {
 
 app.get("/health", (req, res) => res.json({ ok: true, version: "1.0.0" }));
 
+Vibrant._pipeline.generator.register("default", customGenerator);
+
 app.get("/extract", async (req, res) => {
   const url = req.query.url;
   if (!url) return res.status(400).json({ error: "Missing url parameter" });
 
   try {
     // node-vibrant v3: Vibrant.from(url).getPalette()
-    const palette = await Vibrant.from(url)
-      .maxColorCount(16)
-      .getPalette();
 
-    const { background, foreground } = customGenerator(palette);
+    new Vibrant(url, {
+      colorCount: 16
+    })
+      .getPalette()
+      .then(({ foreground, background }) => ({
+      background: background ? background.hex : null,
+      foreground: foreground ? foreground.hex : null,
+    }));
 
-    res.json({
-      background: background.hex,
-      foreground: foreground.hex,
-    });
   } catch (err) {
     console.error("Colour extraction error:", err.message);
     res.status(500).json({ error: err.message });

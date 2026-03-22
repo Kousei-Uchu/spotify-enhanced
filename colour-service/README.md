@@ -1,54 +1,54 @@
 # Spotify Enhanced — Colour Extraction Service
 
-A small Node.js HTTP service that extracts background and foreground
-colours from album art using **node-vibrant** with the exact same
-`customGenerator` algorithm used by the HA frontend.
+A TypeScript Node.js service that extracts album art colours using the **exact same
+algorithm as the HA frontend** — `culori` for WCAG contrast, `node-vibrant` for
+palette extraction, and the same `customGenerator` function from HA's source.
 
-## Why server-side?
+## Files
 
-- HA's frontend uses `node-vibrant` which isn't available in plain browser JS
-- Running it server-side means colours are stored as HA sensor states
-- All Lovelace cards read from those sensors — no client-side image processing
-- Results are consistent and identical to what HA's own media card shows
+```
+colour-service/
+├── src/
+│   ├── rgb.ts           ← exact copy of HA's src/common/color/rgb.ts
+│   ├── extract_color.ts ← exact copy of HA's src/common/image/extract_color.ts
+│   └── server.ts        ← Express HTTP server
+├── package.json
+├── tsconfig.json
+└── spotify-colour.service  ← systemd unit
+```
 
 ## Setup
-
-### On the same machine as Home Assistant (Docker / Pi)
 
 ```bash
 cd colour-service
 npm install
-node server.js
-# Runs on http://127.0.0.1:5174
+npm run build       # compiles TypeScript → dist/
+npm start           # runs on http://127.0.0.1:5174
 ```
 
-### Run as a background service (systemd — for HAOS/Supervised/Pi)
+### Run as background service (systemd)
 
 ```bash
 sudo cp spotify-colour.service /etc/systemd/system/
+sudo sed -i "s|/path/to/colour-service|$(pwd)|" /etc/systemd/system/spotify-colour.service
 sudo systemctl daemon-reload
 sudo systemctl enable spotify-colour
 sudo systemctl start spotify-colour
-sudo systemctl status spotify-colour
 ```
 
-### Docker Compose (add alongside your HA container)
+### Docker Compose
 
 ```yaml
-services:
-  homeassistant:
-    # ... your existing HA config
-
-  spotify-colour:
-    image: node:20-alpine
-    working_dir: /app
-    volumes:
-      - ./colour-service:/app
-    command: sh -c "npm install && node server.js"
-    restart: unless-stopped
-    network_mode: host   # so HA can reach 127.0.0.1:5174
-    environment:
-      - PORT=5174
+spotify-colour:
+  image: node:20-alpine
+  working_dir: /app
+  volumes:
+    - ./colour-service:/app
+  command: sh -c "npm install && npm run build && npm start"
+  restart: unless-stopped
+  network_mode: host
+  environment:
+    - PORT=5174
 ```
 
 ## API
@@ -61,15 +61,7 @@ GET http://127.0.0.1:5174/health
 → { "ok": true, "version": "1.0.0" }
 ```
 
-## Configuration in Home Assistant
+## Sensors created
 
-In the integration options (Settings → Devices & Services → Spotify Enhanced → Configure),
-set the **Colour Service URL** to `http://127.0.0.1:5174` (default, no change needed
-if running on the same machine).
-
-The integration will call this service whenever the album art changes and store
-the results in:
 - `sensor.spotify_enhanced_background_color` — hex background colour
 - `sensor.spotify_enhanced_foreground_color` — hex foreground colour
-
-All Lovelace cards read from these sensors automatically.
