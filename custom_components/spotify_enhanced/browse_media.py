@@ -7,13 +7,13 @@ from homeassistant.core import HomeAssistant
 _LOGGER = logging.getLogger(__name__)
 
 ROOTS = [
-    ("spotify://category/playlists",      "Playlists",         "mdi:playlist-music",  True),
-    ("spotify://category/liked_songs",    "Liked Songs",       "mdi:heart",           False),
-    ("spotify://category/recently_played","Recently Played",   "mdi:history",         False),
-    ("spotify://category/top_tracks",     "Top Tracks",        "mdi:chart-bar",       False),
-    ("spotify://category/top_artists",    "Top Artists",       "mdi:account-music",   True),
-    ("spotify://category/new_releases",   "New Releases",      "mdi:new-box",         True),
-    ("spotify://category/featured",       "Featured",          "mdi:star",            True),
+    ("spotify://category/playlists",       "Playlists",       "mdi:playlist-music",  True),
+    ("spotify://category/liked_songs",     "Liked Songs",     "mdi:cards-heart",     True),
+    ("spotify://category/recently_played", "Recently Played", "mdi:history",         False),
+    ("spotify://category/top_tracks",      "Top Tracks",      "mdi:chart-bar",       False),
+    ("spotify://category/top_artists",     "Top Artists",     "mdi:account-music",   True),
+    ("spotify://category/new_releases",    "New Releases",    "mdi:new-box",         True),
+    ("spotify://category/discover_weekly", "Discover Weekly", "mdi:compass",         True),
 ]
 
 
@@ -48,20 +48,20 @@ def _root():
 async def _category(coordinator, category: str):
     api = coordinator.api
     children = []
-
-
-    titles = dict((c, t) for c, t, _, _ in ROOTS)
+    titles = {c: t for c, t, _, _ in ROOTS}
 
     if category == "playlists":
         r = await api.get_playlists(limit=50)
         for item in r.get("items", []):
             if item:
-                children.append(BrowseMedia(title=item["name"], media_class=MediaClass.PLAYLIST,
+                children.append(BrowseMedia(
+                    title=item["name"], media_class=MediaClass.PLAYLIST,
                     media_content_id=item["uri"], media_content_type=MediaType.PLAYLIST,
                     can_play=True, can_expand=True,
                     thumbnail=(item.get("images") or [{}])[0].get("url")))
 
     elif category == "liked_songs":
+        # Liked Songs can't be played as a context_uri — fetch tracks directly
         r = await api.get_saved_tracks(limit=50)
         for item in r.get("items", []):
             if item and item.get("track"):
@@ -84,7 +84,8 @@ async def _category(coordinator, category: str):
     elif category == "top_artists":
         r = await api.get_top_artists(limit=20)
         for a in r.get("items", []):
-            children.append(BrowseMedia(title=a["name"], media_class=MediaClass.ARTIST,
+            children.append(BrowseMedia(
+                title=a["name"], media_class=MediaClass.ARTIST,
                 media_content_id=a["uri"], media_content_type=MediaType.ARTIST,
                 can_play=True, can_expand=True,
                 thumbnail=(a.get("images") or [{}])[0].get("url")))
@@ -94,26 +95,39 @@ async def _category(coordinator, category: str):
         for a in r.get("albums", {}).get("items", []):
             children.append(_album_node(a))
 
-    elif category == "featured":
-        r = await api.get_featured_playlists(limit=20)
-        for p in r.get("playlists", {}).get("items", []):
+    elif category == "discover_weekly":
+        # Find Discover Weekly in user's playlists
+        r = await api.get_playlists(limit=50)
+        dw = next(
+            (p for p in r.get("items", []) if p and "Discover Weekly" in p.get("name", "")),
+            None
+        )
+        if dw:
+            return await _playlist(coordinator, dw["uri"].split(":")[-1], title="Discover Weekly")
+        # Fallback: show featured playlists
+        r2 = await api.get_featured_playlists(limit=20)
+        for p in r2.get("playlists", {}).get("items", []):
             if p:
-                children.append(BrowseMedia(title=p["name"], media_class=MediaClass.PLAYLIST,
+                children.append(BrowseMedia(
+                    title=p["name"], media_class=MediaClass.PLAYLIST,
                     media_content_id=p["uri"], media_content_type=MediaType.PLAYLIST,
                     can_play=True, can_expand=True,
                     thumbnail=(p.get("images") or [{}])[0].get("url")))
 
     title = titles.get(f"spotify://category/{category}", category.replace("_", " ").title())
     return BrowseMedia(title=title, media_class=MediaClass.DIRECTORY,
-                       media_content_id=f"spotify://category/{category}", media_content_type=MediaType.MUSIC,
+                       media_content_id=f"spotify://category/{category}",
+                       media_content_type=MediaType.MUSIC,
                        can_play=False, can_expand=True, children=children)
 
 
-async def _playlist(coordinator, playlist_id):
+async def _playlist(coordinator, playlist_id, title="Playlist"):
     r = await coordinator.api.get_playlist_tracks(playlist_id, limit=50)
-    children = [_track_node(i["track"]) for i in r.get("items", []) if i and i.get("track")]
-    return BrowseMedia(title="Playlist", media_class=MediaClass.PLAYLIST,
-                       media_content_id=f"spotify:playlist:{playlist_id}", media_content_type=MediaType.PLAYLIST,
+    children = [_track_node(i["track"], playlist_uri=f"spotify:playlist:{playlist_id}", index=idx)
+                for idx, i in enumerate(r.get("items", [])) if i and i.get("track")]
+    return BrowseMedia(title=title, media_class=MediaClass.PLAYLIST,
+                       media_content_id=f"spotify:playlist:{playlist_id}",
+                       media_content_type=MediaType.PLAYLIST,
                        can_play=True, can_expand=True, children=children)
 
 
@@ -121,35 +135,47 @@ async def _album(coordinator, album_id):
     album = await coordinator.api.get_album(album_id)
     imgs = album.get("images", [])
     thumb = imgs[0]["url"] if imgs else None
-    children = [BrowseMedia(title=t["name"], media_class=MediaClass.TRACK,
-                             media_content_id=t["uri"], media_content_type=MediaType.MUSIC,
-                             can_play=True, can_expand=False, thumbnail=thumb)
-                for t in album.get("tracks", {}).get("items", [])]
+    children = [BrowseMedia(
+        title=t["name"], media_class=MediaClass.TRACK,
+        media_content_id=f"spotify:album:{album_id}::offset:{idx}",
+        media_content_type=MediaType.MUSIC,
+        can_play=True, can_expand=False, thumbnail=thumb)
+        for idx, t in enumerate(album.get("tracks", {}).get("items", []))]
     return BrowseMedia(title=album.get("name", "Album"), media_class=MediaClass.ALBUM,
-                       media_content_id=f"spotify:album:{album_id}", media_content_type=MediaType.ALBUM,
+                       media_content_id=f"spotify:album:{album_id}",
+                       media_content_type=MediaType.ALBUM,
                        can_play=True, can_expand=True, thumbnail=thumb, children=children)
 
 
 async def _artist(coordinator, artist_id):
-    top = await coordinator.api.get_artist_top_tracks(artist_id)
+    top    = await coordinator.api.get_artist_top_tracks(artist_id)
     albums = await coordinator.api.get_artist_albums(artist_id, limit=10)
-    children = [_track_node(t) for t in top.get("tracks", [])]
+    children  = [_track_node(t) for t in top.get("tracks", [])]
     children += [_album_node(a) for a in albums.get("items", [])]
     return BrowseMedia(title="Artist", media_class=MediaClass.ARTIST,
-                       media_content_id=f"spotify:artist:{artist_id}", media_content_type=MediaType.ARTIST,
+                       media_content_id=f"spotify:artist:{artist_id}",
+                       media_content_type=MediaType.ARTIST,
                        can_play=True, can_expand=True, children=children)
 
 
-def _track_node(track):
-    imgs = track.get("album", {}).get("images", [])
+def _track_node(track, playlist_uri=None, index=None):
+    imgs    = track.get("album", {}).get("images", [])
     artists = ", ".join(a["name"] for a in track.get("artists", []))
-    return BrowseMedia(title=f"{track['name']} — {artists}", media_class=MediaClass.TRACK,
-                       media_content_id=track["uri"], media_content_type=MediaType.MUSIC,
-                       can_play=True, can_expand=False, thumbnail=imgs[0]["url"] if imgs else None)
+    # Encode playlist context + offset into content_id so media_player.py can parse it
+    if playlist_uri and index is not None:
+        cid = f"{playlist_uri}::track:{track['uri']}::offset:{index}"
+    else:
+        cid = track["uri"]
+    return BrowseMedia(
+        title=f"{track['name']} — {artists}", media_class=MediaClass.TRACK,
+        media_content_id=cid, media_content_type=MediaType.MUSIC,
+        can_play=True, can_expand=False,
+        thumbnail=imgs[0]["url"] if imgs else None)
 
 
 def _album_node(album):
     imgs = album.get("images", [])
     return BrowseMedia(title=album["name"], media_class=MediaClass.ALBUM,
                        media_content_id=album["uri"], media_content_type=MediaType.ALBUM,
-                       can_play=True, can_expand=True, thumbnail=imgs[0]["url"] if imgs else None)
+                       can_play=True, can_expand=True,
+                       thumbnail=imgs[0]["url"] if imgs else None)

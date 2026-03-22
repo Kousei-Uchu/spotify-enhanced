@@ -215,10 +215,31 @@ class SpotifyMediaPlayer(CoordinatorEntity, MediaPlayerEntity):
             await self.coordinator.async_request_refresh()
 
     async def async_play_media(self, media_type: str, media_id: str, **kwargs):
-        if media_id.startswith(("spotify:track:", "spotify:episode:")):
-            await self.coordinator.api.play(device_id=self._active_device(), uris=[media_id])
+        dev = self._active_device()
+        # Playlist with track offset: "spotify:playlist:ID::track:URI::offset:N"
+        if "::track:" in media_id and "::offset:" in media_id:
+            parts = media_id.split("::")
+            context_uri = parts[0]  # spotify:playlist:ID
+            offset_idx  = int(parts[2].split(":")[-1])
+            await self.coordinator.api.play(
+                device_id=dev, context_uri=context_uri,
+                offset={"position": offset_idx}
+            )
+        # Album with offset: "spotify:album:ID::offset:N"
+        elif media_id.startswith("spotify:album:") and "::offset:" in media_id:
+            parts = media_id.split("::")
+            context_uri = parts[0]
+            offset_idx  = int(parts[1].split(":")[-1])
+            await self.coordinator.api.play(
+                device_id=dev, context_uri=context_uri,
+                offset={"position": offset_idx}
+            )
+        # Individual tracks (no context)
+        elif media_id.startswith(("spotify:track:", "spotify:episode:")):
+            await self.coordinator.api.play(device_id=dev, uris=[media_id])
+        # Everything else (playlists, albums, artists) — play as context
         else:
-            await self.coordinator.api.play(device_id=self._active_device(), context_uri=media_id)
+            await self.coordinator.api.play(device_id=dev, context_uri=media_id)
         await self.coordinator.async_request_refresh()
 
     async def async_browse_media(self, media_content_type=None, media_content_id=None):
