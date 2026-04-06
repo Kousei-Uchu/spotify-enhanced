@@ -20,6 +20,8 @@ async def async_setup_entry(
         SpotifyDevicesSensor(coord, entry),
         SpotifyBgColorSensor(coord, entry),
         SpotifyFgColorSensor(coord, entry),
+        SpotifyPrColorSensor(coord, entry),
+        SpotifyAcColorSensor(coord, entry),
     ])
 
 
