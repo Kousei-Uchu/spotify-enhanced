@@ -130,3 +130,33 @@ class SpotifyFgColorSensor(_Base):
     @property
     def native_value(self) -> str:
         return self.coordinator.fg_color or ""
+
+
+class SpotifyPrColorSensor(_Base):
+    """Sensor exposing the extracted foreground colour as a hex string."""
+
+    _attr_name = "Primary Light Color"
+    _attr_icon = "mdi:palette-outline"
+
+    def __init__(self, coord, entry):
+        super().__init__(coord, entry)
+        self._attr_unique_id = f"{entry.entry_id}_fg_color"
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.pr_color or [255, 0, 0]
+
+
+class SpotifyAcColorSensor(_Base):
+    """Sensor exposing the extracted foreground colour as a hex string."""
+
+    _attr_name = "Accent Light Color"
+    _attr_icon = "mdi:palette-outline"
+
+    def __init__(self, coord, entry):
+        super().__init__(coord, entry)
+        self._attr_unique_id = f"{entry.entry_id}_fg_color"
+
+    @property
+    def native_value(self) -> str:
+        return self.coordinator.ac_color or [255, 0, 0]

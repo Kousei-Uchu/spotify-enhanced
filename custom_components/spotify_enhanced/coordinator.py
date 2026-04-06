@@ -19,6 +19,8 @@ from .const import (
 )
 from .spotify_api import SpotifyAPI
 
+from .colours import get_spotify_colors
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -41,6 +43,8 @@ class SpotifyDataUpdateCoordinator(DataUpdateCoordinator):
         # Colour state — updated when art URL changes
         self.bg_color: str = ""
         self.fg_color: str = ""
+        self.pr_color: list[int, int, int] = [255, 0, 0]
+        self.ac_color: list[int, int, int] = [255, 0, 0]
         self._last_art_url: str = ""
 
         async def _token_provider() -> str:
@@ -106,6 +110,9 @@ class SpotifyDataUpdateCoordinator(DataUpdateCoordinator):
                         )
                     else:
                         _LOGGER.debug("Colour service returned %s", r.status)
+            colors = get_spotify_colors(art_url, lights_mode=True)
+            self.pr_color = colors.get("primary", [255, 0, 0])
+            self.ac_color = colors.get("accent", [255, 0, 0])
         except Exception as err:
             _LOGGER.debug(
                 "Colour service unavailable (%s) — cards will use HA theme colours", err
