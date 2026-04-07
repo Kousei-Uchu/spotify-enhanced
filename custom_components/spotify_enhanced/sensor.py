@@ -142,7 +142,7 @@ class SpotifyPrColorSensor(_Base):
 
     def __init__(self, coord, entry):
         super().__init__(coord, entry)
-        self._attr_unique_id = f"{entry.entry_id}_fg_color"
+        self._attr_unique_id = f"{entry.entry_id}_pr_color"
 
     @property
     def native_value(self) -> str:
@@ -157,7 +157,7 @@ class SpotifyAcColorSensor(_Base):
 
     def __init__(self, coord, entry):
         super().__init__(coord, entry)
-        self._attr_unique_id = f"{entry.entry_id}_fg_color"
+        self._attr_unique_id = f"{entry.entry_id}_ac_color"
 
     @property
     def native_value(self) -> str:
