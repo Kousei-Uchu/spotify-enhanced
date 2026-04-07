@@ -110,9 +110,19 @@ class SpotifyDataUpdateCoordinator(DataUpdateCoordinator):
                         )
                     else:
                         _LOGGER.debug("Colour service returned %s", r.status)
-            colors = get_spotify_colors(art_url, lights_mode=True)
+            # Instead of: colors = get_spotify_colors(art_url, lights_mode=True)
+            # Use the Home Assistant executor:
+            colors = await self.hass.async_add_executor_job(
+                get_spotify_colors, 
+                art_url, 
+                None,  # ha_url
+                True,  # verify_cert
+                True   # lights_mode
+            )
+
             self.pr_color = colors.get("primary", [255, 0, 0])
             self.ac_color = colors.get("accent", [255, 0, 0])
+
         except Exception as err:
             _LOGGER.debug(
                 "Colour service unavailable (%s) — cards will use HA theme colours", err
